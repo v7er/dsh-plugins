@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Turn Stats Badge",
+    "description": "Adds a status bar under each finished reply: skill, tokens, context file, cost, per-phase split with cache hits, and prompt-context growth. Click for the full record; expand a phase for each tool and command with its own tokens and cost, press Why for the computed reason, or Ask AI to hand a compact prompt to the composer."
+  }
+}

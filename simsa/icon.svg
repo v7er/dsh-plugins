@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Personal assistant">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#0f172a"/>
+  <path d="M18 22h28a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H30l-8 6v-6h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4z" fill="#7aa2f7" opacity="0.18"/>
+  <path d="M18 22h28a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H30l-8 6v-6h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4z" fill="none" stroke="#7aa2f7" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="24" cy="33" r="2.4" fill="#9ece6a"/>
+  <circle cx="32" cy="33" r="2.4" fill="#e0af68"/>
+  <circle cx="40" cy="33" r="2.4" fill="#bb9af7"/>
+  <path d="M46 14l1.6 4.4L52 20l-4.4 1.6L46 26l-1.6-4.4L40 20l4.4-1.6z" fill="#e0af68"/>
+</svg>

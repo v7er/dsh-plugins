@@ -1,0 +1,11 @@
+- insert:
+    - id: simsa
+      name: '@local/simsa'
+      config:
+        maxMemories: 6
+        maxSnippetChars: 400
+        maxEntries: 1000
+        baseContextTokens: 12000
+        defaultOutputTokens: 2000
+        # Set deepseekApiKey here, or export DEEPSEEK_API_KEY before launching dsh.
+        deepseekApiKey: ''

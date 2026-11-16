@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "title": "Terminal and workspace",
+    "description": "Persistent multi-shell terminal in the right sidebar, plus workspace icons and badges.",
+    "detail": "docs/DETAIL.md"
+  },
+  "dock": {
+    "new": "New terminal",
+    "close": "Close terminal",
+    "collapse": "Collapse terminal",
+    "expand": "Expand terminal",
+    "empty": "No terminal open",
+    "emptyHint": "Open a shell to run commands without leaving the conversation.",
+    "missingTtyd": "ttyd is not installed. Install it with: brew install ttyd",
+    "error": "Terminal error: {message}",
+    "shell": "Shell",
+    "resize": "Resize terminal"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "tools": {
+    "bash": ">",
+    "read": "▤",
+    "write": "✎",
+    "edit": "✎",
+    "grep": "⌕",
+    "glob": "⌕",
+    "web_search": "⌕",
+    "web_fetch": "↧",
+    "subagent": "⤷",
+    "todo_write": "☑",
+    "skill": "✦",
+    "present": "▣"
+  },
+  "variants": {
+    "bash": ">",
+    "search": "⌕",
+    "read": "▤",
+    "write": "✎",
+    "edit": "✎",
+    "code": "{}",
+    "others": "•"
+  }
+}

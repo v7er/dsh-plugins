@@ -1,0 +1,32 @@
+{
+  "name": "@local/turn-stats",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Status bar under every finished reply: skill, tokens, context file, cost, per-phase token split with cache hits, and prompt-context growth. Click for the full record; expand a phase to see each tool and command with its own tokens, cost and duration, then press Why for the computed reason the phase was expensive or Ask AI to hand a compact prompt about that phase to the composer.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

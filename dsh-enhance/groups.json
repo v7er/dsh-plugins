@@ -1,0 +1,40 @@
+{
+  "groups": [
+    {
+      "id": "v7e",
+      "title": "v7e",
+      "icon": "briefcase",
+      "workspaces": [
+        "/Users/tuevo/v7e/aidesk",
+        "/Users/tuevo/v7e/planer",
+        "/Users/tuevo/v7e/20plus/epocket"
+      ]
+    },
+    {
+      "id": "gamehub",
+      "title": "gamehub",
+      "icon": "layers",
+      "workspaces": [
+        "/Users/tuevo/Projects/fanzeal/gamehub",
+        "/Users/tuevo/Projects/fanzeal/gamehub/fzgame-arcade"
+      ]
+    },
+    {
+      "id": "websites",
+      "title": "websites",
+      "icon": "globe",
+      "workspaces": [
+        "/Users/tuevo/Projects/websites/tse"
+      ]
+    },
+    {
+      "id": "dev",
+      "title": "dev",
+      "icon": "code",
+      "workspaces": [
+        "/Users/tuevo/.dsh/plugins",
+        "/Users/tuevo/.dotfiles/.agents"
+      ]
+    }
+  ]
+}

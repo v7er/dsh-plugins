@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Simsa",
+    "description": "Local memory RAG, a prompt refinement gate, and a DeepSeek cost and balance estimate. `/simsa` or `/s` refines and submits; `show` previews; `compact` dedupes and prunes. Memory stays in a JSONL file you own and compacts automatically past its cap.",
+    "detail": "docs/DETAIL.md"
+  }
+}

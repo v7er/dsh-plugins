@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Simsa",
+    "description": "Bộ nhớ cục bộ dạng RAG, cổng tinh chỉnh prompt, và ước tính chi phí cùng số dư DeepSeek. `/simsa` hoặc `/s` tinh chỉnh rồi gửi; `show` xem trước; `compact` gộp và cắt bớt. Bộ nhớ nằm trong tệp JSONL của bạn và tự nén khi vượt hạn mức.",
+    "detail": "docs/DETAIL.md"
+  }
+}

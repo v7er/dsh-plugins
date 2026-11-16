@@ -1,0 +1,24 @@
+{
+  "name": "@local/simsa",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Simsa: local memory RAG, a prompt refinement gate, and a DeepSeek cost/balance estimate for every run.",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

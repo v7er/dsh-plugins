@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "title": "终端与工作区",
+    "description": "右侧栏中的常驻多 shell 终端，以及工作区图标和徽标。",
+    "detail": "docs/DETAIL.md"
+  },
+  "dock": {
+    "new": "新建终端",
+    "close": "关闭终端",
+    "collapse": "收起终端",
+    "expand": "展开终端",
+    "empty": "没有打开的终端",
+    "emptyHint": "打开一个 shell，在不离开对话的情况下运行命令。",
+    "missingTtyd": "未安装 ttyd。请运行：brew install ttyd",
+    "error": "终端错误：{message}",
+    "shell": "Shell",
+    "resize": "调整终端高度"
+  }
+}

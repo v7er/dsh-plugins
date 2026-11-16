@@ -1,0 +1,14 @@
+{
+  "shadowBrowser": true,
+  "workspaces": {
+    "/Users/tuevo/v7e/20plus/epocket": {
+      "icon": "star"
+    },
+    "/Users/tuevo/v7e/aidesk": {
+      "icon": "flask-conical"
+    },
+    "/Users/tuevo/v7e/planer": {
+      "icon": "code"
+    }
+  }
+}

@@ -1,10 +1,11 @@
 # dsh-enhance
 
-Three additions to the Web/Desktop client:
+Four additions to the Web/Desktop client:
 
 1. **Global bar** — a bottom bar with persistent multi-shell terminals and a two-pane split. It stays mounted across sessions.
 2. **Workspace browser with icons and badges** — replaces the shipped `sidebar.workspaces` browser with a compact list that reads `badges.json`.
 3. **Virtual groups** — group workspaces under named folders from `groups.json`.
+4. **Editor tab** — a right-sidebar tab that runs Neovim through `ttyd`, or embeds any noVNC desktop.
 
 ## Feature toggles
 
@@ -101,3 +102,78 @@ The decorator is a CSS `::before` on the Chat tool row. The Trajectory tab has n
 The replacement keeps workspace rows, new session, rename, delete, add by folder picker, search, and session rows. Click a workspace's folder icon or name to expand or collapse its sessions; an expanded folder is green. The header's `⊟` collapses every workspace except those with a running session. The header's `+` opens the native folder picker and adds the chosen directory. Each workspace row shows only `+` (new session) and `⋯` (more). More opens Change icon, Rename, and Delete. Each session row shows a trash icon on hover: it archives the session, which is DSH's only removal (the log is kept). A session with running work asks before stopping it. Change icon opens a Lucide icon grid and saves the choice to `badges.json`. It does **not** keep drag reordering, fork, pin, content search, or the session context menu. Those remain in the shipped browser, which returns when `shadowBrowser` is false or when the replacement throws.
 
 A plugin cannot rewrite itself after a DSH upgrade. The replacement has an error boundary that disposes it and restores the shipped browser on a render failure; it does not auto-update its own code.
+
+## Editor tab (right sidebar)
+
+An **Editor** tab type in the right sidebar, next to Files, Terminal and Browser. The guide card opens a picker; picking an editor starts it and shows it in the tab.
+
+### Discovery
+
+At load the Host scans for these and lists every one it finds:
+
+| Editor | How it runs | Needs |
+|---|---|---|
+| Neovim | `ttyd` running `nvim` | `ttyd`, `nvim` |
+| VS Code | `code serve-web` behind a loopback proxy | VS Code CLI |
+| Cursor | native app, opened on the desktop | Cursor.app |
+| Sublime Text | native app, opened on the desktop | Sublime Text.app |
+| Zed | native app, opened on the desktop | Zed.app |
+
+Neovim loads your normal config: it runs with your `HOME`, `PATH` (Homebrew included), `TERM=xterm-256color` and `COLORTERM=truecolor`, so `~/.config/nvim`, plugins, LSP and clipboard behave as in a local terminal.
+
+VS Code's web server sends `X-Frame-Options` and `frame-ancestors`, so the tab reaches it through a loopback proxy that strips those headers and carries the WebSocket. The first start downloads the VS Code web server once.
+
+Cursor, Sublime Text and Zed have no web UI. They open on the desktop at the workspace folder. To embed them in the tab, point a `novnc` entry at a VNC desktop that serves noVNC.
+
+### Configuration
+
+```json
+{
+  "editors": [
+    { "id": "nvim", "type": "ttyd", "label": "Neovim", "command": "/opt/homebrew/bin/nvim" },
+    { "id": "sublime", "type": "novnc", "label": "Sublime Text", "url": "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale" },
+    { "id": "zed", "type": "novnc", "label": "Zed", "url": "http://127.0.0.1:6081/vnc.html?autoconnect=1&resize=scale" }
+  ],
+  "editorCwd": "/Users/you/project"
+}
+```
+
+- Entries merge with the discovered defaults by `id`; a new `id` adds an editor.
+- `type`: `ttyd`, `web`, `novnc`, or `native`.
+- `editorCwd` is the fallback folder when the Session has no Workspace.
+
+### Behaviour
+
+- **Workspace folder.** The tab resolves the Session's Workspace path and starts the editor there. Neovim gets it as its working directory, VS Code as `--default-folder`, native apps as their open path.
+- **Focus ring.** The right sidebar draws a green inset border while it contains keyboard focus.
+- **Key pass-through.** While the IDE iframe owns focus, the plugin puts DSH's shortcut layer into recording mode, so every key reaches the editor instead of being intercepted. Leaving the iframe restores shortcuts.
+- **One process per editor id**, at most five, reused when the tab reopens, killed with its process group when the plugin unloads.
+
+### About noVNC on macOS
+
+noVNC is a VNC client, not a window server: it shows whatever a VNC server streams.
+
+- Neovim needs no VNC.
+- Sublime Text, Zed and Cursor are native macOS apps. macOS Screen Sharing streams the whole desktop, not one window. A VNC server alone does not isolate an app.
+- For an isolated GUI editor, run it in a Linux desktop container that serves noVNC, then point a `novnc` entry at it:
+
+```sh
+docker run -d -p 6080:6080 \
+  -v "$HOME/Projects:/workspace" \
+  -e AUTOCONNECT=true \
+  --name dsh-ide \
+  theasp/novnc:latest
+```
+
+That image serves noVNC at `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale` with a minimal Xfce desktop. Install Sublime Text or Zed inside it (`docker exec`), then open the URL from the picker.
+
+## Development
+
+Source is TypeScript in `src/`. Build both halves with Vite:
+
+```sh
+npm install
+npm run build
+```
+
+Outputs: `dist/client.js` (browser module) and `dist/index.js` (Host half). `npm run typecheck` checks types.

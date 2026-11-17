@@ -3,16 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Bottom terminal dock with persistent multi-shell tabs, backed by ttyd.",
+  "description": "Bottom terminal dock, workspace browser, and a right-sidebar editor tab backed by ttyd or noVNC.",
+  "scripts": {
+    "build": "vite build --config vite.config.ts && vite build --config vite.host.config.ts",
+    "build:client": "vite build --config vite.config.ts",
+    "build:host": "vite build --config vite.host.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
   "exports": {
-    ".": "./index.js",
-    "./client": "./client.js",
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
-    "client.js",
+    "dist",
     "cordis.patch.yml",
     "badges.json",
     "decorators.json",
@@ -33,5 +38,11 @@
         "@deepseek-ai/dsh-client-ui-layout"
       ]
     }
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8"
   }
 }

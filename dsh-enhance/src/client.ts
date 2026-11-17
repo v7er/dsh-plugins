@@ -1,11 +1,11 @@
-window.__ModuleLoader__.load({
-  id: '@local/dsh-enhance',
-  factory(require) {
-    const React = require('react')
-    const h = React.createElement
-    const NS = 'dshEnhance'
-    const API = '/dsh-enhance/terminals'
-    let sidebarRight = null
+import React from 'react'
+
+const h: any = React.createElement
+const NS = 'dshEnhance'
+const API = '/dsh-enhance/terminals'
+let sidebarRight: any = null
+let workspacesService: any = null
+let shortcutsService: any = null
 
     const en = {
       'meta.title': 'Terminal and workspace',
@@ -51,6 +51,22 @@ window.__ModuleLoader__.load({
       'browser.more': 'More',
       'browser.changeIcon': 'Change icon',
       'browser.empty': 'No workspaces',
+      'editor.card': 'Editor',
+      'editor.cardHint': 'Neovim, VS Code, or a noVNC desktop in the right sidebar.',
+      'editor.title': 'Editor',
+      'editor.intro': 'Pick an editor. It opens in this tab at the workspace folder.',
+      'editor.starting': 'Starting…',
+      'editor.running': 'Running',
+      'editor.unavailable': 'Unavailable',
+      'editor.nativeOpened': 'Opened {label} on your desktop.',
+      'editor.back': 'Back to editors',
+      'editor.refresh': 'Rescan editors',
+      'editor.frame': 'Editor',
+      'editor.type.ttyd': 'terminal',
+      'editor.type.web': 'web server',
+      'editor.type.novnc': 'noVNC',
+      'editor.type.native': 'desktop app',
+      'editor.hint': 'Sublime Text, Zed and Cursor have no web UI; add a noVNC URL in config.json to embed them.',
     }
 
     const zh = {
@@ -97,6 +113,22 @@ window.__ModuleLoader__.load({
       'browser.more': '更多',
       'browser.changeIcon': '更换图标',
       'browser.empty': '没有工作区',
+      'editor.card': '编辑器',
+      'editor.cardHint': '在右侧栏中运行 Neovim、VS Code 或 noVNC 桌面应用。',
+      'editor.title': '编辑器',
+      'editor.intro': '选择一个编辑器，它会在当前标签中打开工作区目录。',
+      'editor.starting': '启动中…',
+      'editor.running': '运行中',
+      'editor.unavailable': '不可用',
+      'editor.nativeOpened': '已在桌面打开 {label}。',
+      'editor.back': '返回编辑器列表',
+      'editor.refresh': '重新扫描编辑器',
+      'editor.frame': '编辑器',
+      'editor.type.ttyd': '终端',
+      'editor.type.web': '网页服务',
+      'editor.type.novnc': 'noVNC',
+      'editor.type.native': '桌面应用',
+      'editor.hint': 'Sublime Text、Zed 和 Cursor 没有网页版；在 config.json 中添加 noVNC 地址即可嵌入。',
     }
 
     const iconButtonStyle = {
@@ -191,8 +223,8 @@ window.__ModuleLoader__.load({
     }
 
     const dockStore = (() => {
-      let state = { active: null, terminals: [], shells: [], ttyd: true, error: null }
-      const listeners = new Set()
+      let state: any = { active: null, terminals: [], shells: [], ttyd: true, error: null }
+      const listeners = new Set<() => void>()
       const emit = () => { for (const listener of listeners) listener() }
       const set = (patch) => { state = { ...state, ...patch }; emit() }
       const refresh = async () => {
@@ -253,8 +285,8 @@ window.__ModuleLoader__.load({
     })()
 
     const globalStore = (() => {
-      let state = { expanded: true, height: 260, split: false, tabs: [], active: null, left: null, right: null }
-      const listeners = new Set()
+      let state: any = { expanded: true, height: 260, split: false, tabs: [], active: null, left: null, right: null }
+      const listeners = new Set<() => void>()
       const emit = () => { for (const listener of listeners) listener() }
       const set = (patch) => { state = { ...state, ...patch }; emit() }
       return {
@@ -890,6 +922,15 @@ window.__ModuleLoader__.load({
     }
 
     const groupStyle = {
+      marginBottom: '6px',
+      padding: '2px 4px 4px',
+      border: '1px solid var(--dsw-alias-border-l2)',
+      borderRadius: 'var(--dsw-radius-md)',
+      background: 'var(--dsw-alias-bg-layer-2)',
+      overflow: 'hidden',
+    }
+
+    const workspaceBlockStyle = {
       marginBottom: '4px',
     }
 
@@ -1059,8 +1100,8 @@ window.__ModuleLoader__.load({
       fontSize: '12px',
     }
 
-    class Boundary extends React.Component {
-      constructor(props) {
+    class Boundary extends React.Component<any, any> {
+      constructor(props: any) {
         super(props)
         this.state = { failed: false }
       }
@@ -1069,7 +1110,7 @@ window.__ModuleLoader__.load({
         return { failed: true }
       }
 
-      componentDidCatch(error) {
+      componentDidCatch(error: any) {
         this.props.onCrash?.(error)
       }
 
@@ -1111,6 +1152,7 @@ window.__ModuleLoader__.load({
     const browserCss = `
       @keyframes dsh-enhance-spin { to { transform: rotate(360deg); } }
       .dsh-enhance-row:hover { background: var(--dsw-alias-bg-layer-2); }
+      .dsh-enhance-group .dsh-enhance-row:hover { background: var(--dsw-alias-bg-layer-3); }
       .dsh-enhance-row:focus-visible { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: -1px; }
       .dsh-enhance-session-action { opacity: 0; }
       .dsh-enhance-row:hover .dsh-enhance-session-action,
@@ -1205,7 +1247,7 @@ window.__ModuleLoader__.load({
           : kinds.includes('running') ? 'running'
             : kinds.includes('done') ? 'done'
               : 'idle'
-        return h('div', { key: workspace.workspaceId, style: groupStyle },
+        return h('div', { key: workspace.workspaceId, style: workspaceBlockStyle },
           h('div', { className: 'dsh-enhance-row', style: { ...workspaceRowStyle, paddingLeft: (indent ? 16 : 0) + 4 + 'px', position: 'relative' } },
             h('button', {
               type: 'button',
@@ -1370,8 +1412,8 @@ window.__ModuleLoader__.load({
       for (const group of activeGroups) {
         const members = (group.workspaces ?? []).map((path) => byPath.get(path)).filter((workspace) => workspace !== undefined)
         if (members.length === 0) continue
-        rows.push(h('div', { key: 'group:' + group.id, style: groupStyle },
-          h('div', { className: 'dsh-enhance-row', style: { ...workspaceRowStyle, position: 'relative' } },
+        rows.push(h('div', { key: 'group:' + group.id, className: 'dsh-enhance-group', style: groupStyle },
+          h('div', { className: 'dsh-enhance-row', style: { ...workspaceRowStyle, paddingLeft: '8px', position: 'relative' } },
             h('span', { style: workspaceTitleStyle }, group.title),
             h('span', { style: { flex: 'none', fontSize: '10px', color: 'var(--dsw-alias-label-secondary)' } }, String(members.length)),
           ),
@@ -1432,7 +1474,242 @@ window.__ModuleLoader__.load({
       return h(Boundary, { onCrash: props.onCrash }, h(ShadowBrowser, props))
     }
 
-    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sidebarRight', 'shortcuts']
+    const EDITOR_ID = '@local/dsh-enhance/editor'
+    const EDITOR_API = '/dsh-enhance/editors'
+    const editorPaneStyle = {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      height: '100%',
+      minHeight: 0,
+      padding: '14px',
+      overflow: 'auto',
+      background: 'var(--dsw-alias-bg-base)',
+      color: 'var(--dsw-alias-label-primary)',
+      font: 'inherit',
+    }
+    const editorHeaderStyle = { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }
+    const editorCwdStyle = {
+      marginLeft: 'auto',
+      maxWidth: '62%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      padding: '2px 8px',
+      border: '1px solid var(--dsw-alias-border-l2)',
+      borderRadius: '999px',
+      fontSize: '11px',
+      color: 'var(--dsw-alias-label-secondary)',
+    }
+    const editorGridStyle = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+      gap: '8px',
+    }
+    const editorCardStyle = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      padding: '10px',
+      border: '1px solid var(--dsw-alias-border-l2)',
+      borderRadius: 'var(--dsw-radius-md)',
+      background: 'var(--dsw-alias-bg-layer-2)',
+      color: 'inherit',
+      font: 'inherit',
+      textAlign: 'left',
+      cursor: 'pointer',
+      transition: 'border-color 0.15s, background 0.15s',
+    }
+    const editorIconStyle = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '30px',
+      height: '30px',
+      flex: 'none',
+      borderRadius: '8px',
+      color: '#fff',
+      fontSize: '11px',
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
+    }
+    const editorMetaStyle = { fontSize: '11px', color: 'var(--dsw-alias-label-secondary)' }
+    const editorCardCss = `
+      .dsh-editor-card:hover:not(:disabled) {
+        border-color: var(--dsw-alias-state-business-primary);
+        background: var(--dsw-alias-bg-layer-3);
+      }
+      .dsh-editor-card:focus-visible {
+        outline: 2px solid var(--dsw-alias-state-business-primary);
+        outline-offset: 1px;
+      }
+    `
+
+    function workspacePathFor(sessionId) {
+      try {
+        const items = workspacesService?.list?.getSnapshot?.()?.items
+        if (!Array.isArray(items)) return undefined
+        const hit = items.find((workspace) => Array.isArray(workspace.sessionIds) && workspace.sessionIds.includes(sessionId))
+        return typeof hit?.path === 'string' ? hit.path : undefined
+      } catch {
+        return undefined
+      }
+    }
+
+    function shortPath(path) {
+      if (typeof path !== 'string' || path === '') return ''
+      return path.replace(/^\/Users\/[^/]+/u, '~')
+    }
+
+    // shortcut: the picked editor URL lives in component state, so a page reload shows the picker again.
+    function EditorBody({ t, sessionId }) {
+      const [status, setStatus] = React.useState(null)
+      const [frame, setFrame] = React.useState(null)
+      const [error, setError] = React.useState(null)
+      const [busy, setBusy] = React.useState(null)
+      const [keysThrough, setKeysThrough] = React.useState(false)
+      const iframeRef = React.useRef(null)
+      const cwd = workspacePathFor(sessionId)
+
+      const refresh = React.useCallback(() => {
+        void fetch(EDITOR_API)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data !== null && typeof data === 'object') setStatus(data)
+          })
+          .catch((failure) => setError(String(failure)))
+      }, [])
+
+      React.useEffect(() => { refresh() }, [refresh])
+
+      React.useEffect(() => {
+        const onFocusIn = (event) => {
+          if (iframeRef.current !== null && event.target === iframeRef.current) setKeysThrough(true)
+        }
+        const onFocusOut = (event) => {
+          if (iframeRef.current !== null && event.target === iframeRef.current) setKeysThrough(false)
+        }
+        const syncKeysThrough = () => setKeysThrough(iframeRef.current !== null && document.activeElement === iframeRef.current)
+        const onWindowBlur = syncKeysThrough
+        const onWindowFocus = syncKeysThrough
+        document.addEventListener('focusin', onFocusIn)
+        document.addEventListener('focusout', onFocusOut)
+        window.addEventListener('blur', onWindowBlur)
+        window.addEventListener('focus', onWindowFocus)
+        return () => {
+          document.removeEventListener('focusin', onFocusIn)
+          document.removeEventListener('focusout', onFocusOut)
+          window.removeEventListener('blur', onWindowBlur)
+          window.removeEventListener('focus', onWindowFocus)
+        }
+      }, [])
+
+      // While the IDE owns the keyboard, DSH stops intercepting shortcuts so every key reaches it.
+      React.useEffect(() => {
+        if (shortcutsService === null || typeof shortcutsService.recording !== 'function') return
+        void Promise.resolve(shortcutsService.recording(keysThrough)).catch(() => {})
+        return () => { void Promise.resolve(shortcutsService.recording(false)).catch(() => {}) }
+      }, [keysThrough])
+
+      const open = async (editor) => {
+        setBusy(editor.id)
+        setError(null)
+        try {
+          const response = await fetch(EDITOR_API, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ op: 'start', editor: editor.id, cwd }),
+          })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error ?? 'start failed')
+          if (data.native === true) setFrame({ native: true, label: data.label ?? editor.label })
+          else setFrame({ url: data.url })
+        } catch (failure) {
+          setError(failure instanceof Error ? failure.message : String(failure))
+        } finally {
+          setBusy(null)
+        }
+      }
+
+      if (frame !== null && frame.url !== undefined) {
+        return h('div', {
+          style: { display: 'flex', flex: '1', minHeight: 0, height: '100%' },
+        }, h('iframe', {
+          ref: iframeRef,
+          src: frame.url,
+          title: t('editor.frame'),
+          allow: 'clipboard-read; clipboard-write; fullscreen',
+          style: { flex: '1', width: '100%', minHeight: 0, border: 'none', background: '#17191d' },
+        }))
+      }
+
+      if (frame !== null && frame.native === true) {
+        return h('div', { style: editorPaneStyle },
+          h('div', { style: { fontSize: '13px' } }, t('editor.nativeOpened').replace('{label}', frame.label)),
+          h('button', {
+            type: 'button',
+            onClick: () => setFrame(null),
+            style: { ...editorCardStyle, width: 'fit-content' },
+          }, t('editor.back')),
+        )
+      }
+
+      const editors = status !== null && Array.isArray(status.editors) ? status.editors : []
+      const running = new Set(status !== null && Array.isArray(status.running) ? status.running.map((item) => item.editorId) : [])
+      return h('div', { style: editorPaneStyle },
+        h('style', {}, editorCardCss),
+        h('div', { style: editorHeaderStyle },
+          h('span', { style: { fontSize: '13px', fontWeight: 600 } }, t('editor.title')),
+          cwd !== undefined ? h('span', { style: editorCwdStyle, title: cwd }, shortPath(cwd)) : null,
+          h('button', {
+            type: 'button',
+            title: t('editor.refresh'),
+            'aria-label': t('editor.refresh'),
+            onClick: refresh,
+            style: { ...editorCardStyle, padding: '4px 8px', width: 'fit-content', fontSize: '12px' },
+          }, '↻'),
+        ),
+        h('div', { style: editorMetaStyle }, t('editor.intro')),
+        error !== null
+          ? h('div', { role: 'alert', style: { fontSize: '12px', color: 'var(--dsw-alias-state-error-primary)' } }, error)
+          : null,
+        editors.length === 0
+          ? h('div', { style: editorMetaStyle }, status === null ? t('editor.starting') : t('editor.hint'))
+          : h('div', { style: editorGridStyle }, editors.map((editor) => {
+              const isRunning = running.has(editor.id)
+              const dot = isRunning
+                ? 'var(--dsw-alias-state-business-primary)'
+                : editor.available === true ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-border-l3)'
+              return h('button', {
+                key: editor.id,
+                type: 'button',
+                className: 'dsh-editor-card',
+                disabled: editor.available !== true || busy !== null,
+                title: editor.available === true ? editor.label : (editor.reason ?? t('editor.unavailable')),
+                onClick: () => { if (editor.available === true) void open(editor) },
+                style: {
+                  ...editorCardStyle,
+                  cursor: editor.available === true ? 'pointer' : 'not-allowed',
+                  opacity: editor.available === true ? 1 : 0.55,
+                },
+              },
+              h('span', { style: { ...editorIconStyle, background: editor.color ?? '#6b7280' } }, editor.icon ?? editor.label.slice(0, 2)),
+              h('span', { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+                h('span', { style: { fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, editor.label),
+                h('span', { style: editorMetaStyle },
+                  busy === editor.id ? t('editor.starting')
+                    : isRunning ? t('editor.running')
+                      : editor.available === true ? t('editor.type.' + editor.type)
+                        : (editor.reason ?? t('editor.unavailable'))),
+              ),
+              h('span', { style: { width: '7px', height: '7px', flex: 'none', borderRadius: '50%', background: dot } }),
+              )
+            })),
+        h('div', { style: { marginTop: 'auto', ...editorMetaStyle } }, t('editor.hint')),
+      )
+    }
+
+    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sidebarRight', 'sidebarRightTabs', 'shortcuts']
 
     function DecoratorStyle() {
       const [decorators, setDecorators] = React.useState({ tools: {}, variants: {} })
@@ -1547,8 +1824,18 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       sidebarRight = ctx.sidebarRight
+      workspacesService = ctx.workspaces
+      shortcutsService = ctx.shortcuts
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'dsh-enhance: dictionaries')
       const t = ctx.locale.bind(NS)
+
+      ctx.effect(() => {
+        const style = document.createElement('style')
+        style.dataset.dshEnhance = 'rightbar-focus'
+        style.textContent = '[data-sidebar-right-panel]:focus-within{box-shadow:inset 0 0 0 2px var(--dsw-alias-state-success-primary,#2ea043);}'
+        document.head.appendChild(style)
+        return () => style.remove()
+      }, 'dsh-enhance: rightbar focus ring')
 
       ctx.effect(
         () => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
@@ -1566,6 +1853,28 @@ window.__ModuleLoader__.load({
           locale: NS,
         }, SettingsPage)),
         'dsh-enhance: settings',
+      )
+
+      ctx.effect(() => ctx.sidebarRightTabs.register({
+        id: EDITOR_ID,
+        kind: 'editor',
+        multiple: true,
+        keepMounted: true,
+        title: () => t('editor.title'),
+        guide: [{
+          id: 'editor',
+          order: 10,
+          title: () => t('editor.card'),
+          description: () => t('editor.cardHint'),
+        }],
+      }), 'dsh-enhance: editor tab type')
+      ctx.effect(
+        () => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
+          name: 'sidebar.right.pane.tab',
+          key: EDITOR_ID,
+          locale: NS,
+        }, EditorBody)),
+        'dsh-enhance: editor tab body',
       )
 
       const inGlobal = (target) => target !== undefined && target !== null
@@ -1680,6 +1989,4 @@ window.__ModuleLoader__.load({
         })
     }
 
-    return { apply, inject }
-  },
-})
+    export { apply, inject }

@@ -2,5 +2,13 @@
   "customLeftbar": true,
   "globalBar": true,
   "virtualGroups": true,
-  "splitPanes": true
+  "splitPanes": true,
+  "editors": [
+    {
+      "id": "nvim",
+      "type": "ttyd",
+      "label": "Neovim",
+      "command": "nvim"
+    }
+  ]
 }

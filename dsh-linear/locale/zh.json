@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Linear 看板",
+    "description": "连接 Linear，将项目关联到工作区，把任务同步到本地看板，并为每个任务启动一个智能体会话。",
+    "detail": "docs/DETAIL.md"
+  }
+}

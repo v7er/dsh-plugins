@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-linear
+      name: '@local/dsh-linear'

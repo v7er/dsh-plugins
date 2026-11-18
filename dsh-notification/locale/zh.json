@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "通知",
+    "description": "账户入口上方的通知铃铛，列出插件推送的通知及其操作。",
+    "detail": "docs/DETAIL.md"
+  }
+}

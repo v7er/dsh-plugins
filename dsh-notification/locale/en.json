@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Notifications",
+    "description": "A bell above the account launcher that lists notifications from plugins, with their actions.",
+    "detail": "docs/DETAIL.md"
+  }
+}

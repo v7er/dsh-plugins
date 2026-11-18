@@ -79,6 +79,19 @@ interface EditorDef {
   color: string
 }
 
+/** The narrow `ctx.commands` face this plugin registers into. */
+interface EnhanceCommandScope {
+  effect(fn: () => () => void, label?: string): () => void
+  commands: {
+    register(definition: {
+      name: string
+      description: string
+      input?: { hint: string }
+      handler(invocation: { rawInput: string }): Promise<{ kind: 'success' | 'error'; text: string }>
+    }): () => void
+  }
+}
+
 const EDITOR_DEFAULTS: EditorDef[] = [
   { id: 'nvim', type: 'ttyd', label: 'Neovim', command: findCommand(['/opt/homebrew/bin/nvim', '/usr/local/bin/nvim', 'nvim']), icon: 'N', color: '#57a143' },
   { id: 'vscode', type: 'web', label: 'VS Code', command: findCommand(['/opt/homebrew/bin/code', '/usr/local/bin/code', '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code']), icon: 'VS', color: '#007acc' },
@@ -516,6 +529,61 @@ export function apply(ctx: any, config: any = {}) {
     }
     return { editorId: def.id, url: entry.url }
   }
+
+  const commandHelp = 'Subcommands: status, terminal [shell], editor [id], stop <terminal|editor> <id>, config'
+
+  const runCommand = async (rawInput: string): Promise<{ kind: 'success' | 'error'; text: string }> => {
+    const parts = rawInput.trim().split(/\s+/).filter((part) => part !== '')
+    const sub = parts[0] ?? ''
+    if (sub === '' || sub === 'help') return { kind: 'success', text: commandHelp }
+    if (sub === 'status') {
+      const ready = editorStatus().editors.filter((editor) => editor.available).map((editor) => editor.label)
+      return {
+        kind: 'success',
+        text: [
+          `ttyd: ${ttydPath ?? 'not found'}`,
+          `terminals: ${terminals.size}/${maxTerminals}`,
+          `editors ready: ${ready.length > 0 ? ready.join(', ') : 'none'}`,
+        ].join('\n'),
+      }
+    }
+    if (sub === 'terminal') {
+      const terminal = await create({ shell: parts[1] })
+      return { kind: 'success', text: `Terminal ${terminal.id} ready: ${terminal.url}` }
+    }
+    if (sub === 'editor') {
+      const id = parts[1] ?? editorDefs().find((editor) => editorAvailability(editor).available)?.id
+      if (id === undefined) return { kind: 'error', text: 'No editor is available.' }
+      const started = await startEditor(id)
+      return {
+        kind: 'success',
+        text: started.url !== undefined ? `${id} ready: ${started.url}` : `${id} opened on your desktop.`,
+      }
+    }
+    if (sub === 'stop') {
+      const kind = parts[1]
+      const id = parts[2]
+      if (id === undefined || (kind !== 'terminal' && kind !== 'editor')) {
+        return { kind: 'error', text: 'Usage: /enhance stop <terminal|editor> <id>' }
+      }
+      const stopped = kind === 'terminal' ? close(id) : stopEditor(id)
+      return stopped
+        ? { kind: 'success', text: `Stopped ${kind} ${id}.` }
+        : { kind: 'error', text: `No ${kind} ${id}.` }
+    }
+    if (sub === 'config') return { kind: 'success', text: JSON.stringify(readConfig(), null, 2) }
+    return { kind: 'error', text: `Unknown subcommand "${sub}". ${commandHelp}` }
+  }
+
+  // Optional: a headless composition has no command registry, and the plugin still works.
+  ctx.inject(['commands'], (scope: EnhanceCommandScope) => {
+    scope.effect(() => scope.commands.register({
+      name: 'enhance',
+      description: 'Open a terminal or editor, or report dsh-enhance status',
+      input: { hint: '<status|terminal|editor|stop|config>' },
+      handler: ({ rawInput }) => runCommand(rawInput),
+    }), 'dsh-enhance: /enhance command')
+  })
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',

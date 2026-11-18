@@ -1,0 +1,15 @@
+{
+  "apiKeyEnv": "LINEAR_API_KEY",
+  "pollIntervalMs": 60000,
+  "autoStart": true,
+  "maxParallel": 3,
+  "promptTemplate": "",
+  "workspaces": [
+    {
+      "id": "ws-763002de",
+      "name": "gamehub",
+      "path": "/Users/tuevo/Projects/fanzeal/gamehub",
+      "projectId": "38f25d35-1e41-4b74-817a-573dfda029ad"
+    }
+  ]
+}

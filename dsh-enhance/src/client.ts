@@ -54,12 +54,15 @@ let shortcutsService: any = null
       'editor.card': 'Editor',
       'editor.cardHint': 'Neovim, VS Code, or a noVNC desktop in the right sidebar.',
       'editor.title': 'Editor',
-      'editor.intro': 'Pick an editor. It opens in this tab at the workspace folder.',
+      'editor.intro': 'Nothing starts until you pick one. Closing this tab keeps it running.',
       'editor.starting': 'Starting…',
       'editor.running': 'Running',
       'editor.unavailable': 'Unavailable',
       'editor.nativeOpened': 'Opened {label} on your desktop.',
       'editor.back': 'Back to editors',
+      'editor.switch': 'Switch editor',
+      'editor.shutdown': 'Shut down',
+      'editor.shutdownLabel': 'Shut down {label}',
       'editor.refresh': 'Rescan editors',
       'editor.frame': 'Editor',
       'editor.type.ttyd': 'terminal',
@@ -67,6 +70,21 @@ let shortcutsService: any = null
       'editor.type.novnc': 'noVNC',
       'editor.type.native': 'desktop app',
       'editor.hint': 'Sublime Text, Zed and Cursor have no web UI; add a noVNC URL in config.json to embed them.',
+      'command.search': 'Search subcommands',
+      'command.empty': 'No subcommands',
+      'command.noResults': 'No matching subcommand',
+      'command.groupOpen': 'Open',
+      'command.groupHost': 'Host',
+      'command.terminal': 'New terminal',
+      'command.terminalDetail': 'Open a shell tab in the global bar',
+      'command.editor': 'Editor',
+      'command.editorDetail': 'Open the editor tab in the right sidebar',
+      'command.status': 'Status',
+      'command.statusDetail': 'Show ttyd, terminal, and editor availability',
+      'command.config': 'Config',
+      'command.configDetail': 'Show the plugin configuration',
+      'command.noSession': 'This session is not ready yet.',
+      'command.noCommand': 'The host does not offer /enhance.',
     }
 
     const zh = {
@@ -116,12 +134,15 @@ let shortcutsService: any = null
       'editor.card': '编辑器',
       'editor.cardHint': '在右侧栏中运行 Neovim、VS Code 或 noVNC 桌面应用。',
       'editor.title': '编辑器',
-      'editor.intro': '选择一个编辑器，它会在当前标签中打开工作区目录。',
+      'editor.intro': '在你选择之前不会启动任何程序。关闭此标签后它仍会继续运行。',
       'editor.starting': '启动中…',
       'editor.running': '运行中',
       'editor.unavailable': '不可用',
       'editor.nativeOpened': '已在桌面打开 {label}。',
       'editor.back': '返回编辑器列表',
+      'editor.switch': '切换编辑器',
+      'editor.shutdown': '关闭应用',
+      'editor.shutdownLabel': '关闭 {label}',
       'editor.refresh': '重新扫描编辑器',
       'editor.frame': '编辑器',
       'editor.type.ttyd': '终端',
@@ -129,6 +150,21 @@ let shortcutsService: any = null
       'editor.type.novnc': 'noVNC',
       'editor.type.native': '桌面应用',
       'editor.hint': 'Sublime Text、Zed 和 Cursor 没有网页版；在 config.json 中添加 noVNC 地址即可嵌入。',
+      'command.search': '搜索子命令',
+      'command.empty': '没有子命令',
+      'command.noResults': '没有匹配的子命令',
+      'command.groupOpen': '打开',
+      'command.groupHost': '主机',
+      'command.terminal': '新建终端',
+      'command.terminalDetail': '在全局栏中打开一个 shell 标签',
+      'command.editor': '编辑器',
+      'command.editorDetail': '在右侧栏中打开编辑器标签',
+      'command.status': '状态',
+      'command.statusDetail': '显示 ttyd、终端和编辑器的可用性',
+      'command.config': '配置',
+      'command.configDetail': '显示插件配置',
+      'command.noSession': '该会话尚未就绪。',
+      'command.noCommand': '主机未提供 /enhance。',
     }
 
     const iconButtonStyle = {
@@ -1528,7 +1564,9 @@ let shortcutsService: any = null
       height: '30px',
       flex: 'none',
       borderRadius: '8px',
-      color: '#fff',
+      border: '1px solid var(--dsw-alias-border-l2)',
+      background: 'var(--dsw-alias-bg-layer-3)',
+      color: 'var(--dsw-alias-label-secondary)',
       fontSize: '11px',
       fontWeight: 700,
       letterSpacing: '-0.02em',
@@ -1542,6 +1580,58 @@ let shortcutsService: any = null
       .dsh-editor-card:focus-visible {
         outline: 2px solid var(--dsw-alias-state-business-primary);
         outline-offset: 1px;
+      }
+      .dsh-editor-shutdown {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: 6px;
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--dsw-alias-label-secondary);
+        font: inherit;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+      }
+      .dsh-editor-card-wrap:hover .dsh-editor-shutdown,
+      .dsh-editor-card-wrap:focus-within .dsh-editor-shutdown {
+        opacity: 1;
+      }
+      .dsh-editor-shutdown:hover {
+        color: var(--dsw-alias-state-error-primary);
+        border-color: var(--dsw-alias-state-error-primary);
+      }
+      .dsh-editor-shutdown:focus-visible {
+        opacity: 1;
+        outline: 2px solid var(--dsw-alias-state-business-primary);
+        outline-offset: 1px;
+      }
+      @media (hover: none) {
+        .dsh-editor-shutdown { opacity: 1; }
+      }
+      .dsh-editor-chip {
+        border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--dsw-alias-label-secondary);
+        font: inherit;
+        font-size: 11px;
+        line-height: 16px;
+        padding: 2px 8px;
+        cursor: pointer;
+      }
+      .dsh-editor-chip:hover {
+        background: var(--dsw-alias-interactive-bg-hover);
+        color: var(--dsw-alias-label-primary);
       }
     `
 
@@ -1561,7 +1651,8 @@ let shortcutsService: any = null
       return path.replace(/^\/Users\/[^/]+/u, '~')
     }
 
-    // shortcut: the picked editor URL lives in component state, so a page reload shows the picker again.
+    // The picker is the home view: nothing starts until a card is clicked, and a
+    // running editor is re-attached from its card instead of being restarted.
     function EditorBody({ t, sessionId }) {
       const [status, setStatus] = React.useState(null)
       const [frame, setFrame] = React.useState(null)
@@ -1580,7 +1671,11 @@ let shortcutsService: any = null
           .catch((failure) => setError(String(failure)))
       }, [])
 
-      React.useEffect(() => { refresh() }, [refresh])
+      React.useEffect(() => {
+        refresh()
+        const timer = setInterval(refresh, 5000)
+        return () => clearInterval(timer)
+      }, [refresh])
 
       React.useEffect(() => {
         const onFocusIn = (event) => {
@@ -1623,7 +1718,7 @@ let shortcutsService: any = null
           const data = await response.json()
           if (!response.ok) throw new Error(data.error ?? 'start failed')
           if (data.native === true) setFrame({ native: true, label: data.label ?? editor.label })
-          else setFrame({ url: data.url })
+          else setFrame({ editorId: editor.id, label: editor.label, url: data.url })
         } catch (failure) {
           setError(failure instanceof Error ? failure.message : String(failure))
         } finally {
@@ -1631,10 +1726,59 @@ let shortcutsService: any = null
         }
       }
 
+      const shutdown = async (editorId) => {
+        setBusy(editorId)
+        setError(null)
+        try {
+          const response = await fetch(EDITOR_API, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ op: 'stop', editorId }),
+          })
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.error ?? 'stop failed')
+          setFrame((current) => (current !== null && current.editorId === editorId ? null : current))
+          refresh()
+        } catch (failure) {
+          setError(failure instanceof Error ? failure.message : String(failure))
+        } finally {
+          setBusy(null)
+        }
+      }
+
+      const styleTag = h('style', {}, editorCardCss)
+
       if (frame !== null && frame.url !== undefined) {
         return h('div', {
-          style: { display: 'flex', flex: '1', minHeight: 0, height: '100%' },
-        }, h('iframe', {
+          style: { display: 'flex', flexDirection: 'column', flex: '1', minHeight: 0, height: '100%' },
+        },
+        styleTag,
+        h('div', {
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flex: 'none',
+            padding: '6px 10px',
+            borderBottom: '1px solid var(--dsw-alias-border-l2)',
+          },
+        },
+        h('span', {
+          style: { fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+        }, frame.label),
+        h('span', { style: { flex: '1' } }),
+        h('button', {
+          type: 'button',
+          className: 'dsh-editor-chip',
+          onClick: () => setFrame(null),
+        }, t('editor.switch')),
+        h('button', {
+          type: 'button',
+          className: 'dsh-editor-chip',
+          disabled: busy !== null,
+          onClick: () => { void shutdown(frame.editorId) },
+        }, t('editor.shutdown'))),
+        h('iframe', {
           ref: iframeRef,
           src: frame.url,
           title: t('editor.frame'),
@@ -1645,6 +1789,7 @@ let shortcutsService: any = null
 
       if (frame !== null && frame.native === true) {
         return h('div', { style: editorPaneStyle },
+          styleTag,
           h('div', { style: { fontSize: '13px' } }, t('editor.nativeOpened').replace('{label}', frame.label)),
           h('button', {
             type: 'button',
@@ -1657,7 +1802,7 @@ let shortcutsService: any = null
       const editors = status !== null && Array.isArray(status.editors) ? status.editors : []
       const running = new Set(status !== null && Array.isArray(status.running) ? status.running.map((item) => item.editorId) : [])
       return h('div', { style: editorPaneStyle },
-        h('style', {}, editorCardCss),
+        styleTag,
         h('div', { style: editorHeaderStyle },
           h('span', { style: { fontSize: '13px', fontWeight: 600 } }, t('editor.title')),
           cwd !== undefined ? h('span', { style: editorCwdStyle, title: cwd }, shortPath(cwd)) : null,
@@ -1680,8 +1825,12 @@ let shortcutsService: any = null
               const dot = isRunning
                 ? 'var(--dsw-alias-state-business-primary)'
                 : editor.available === true ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-border-l3)'
-              return h('button', {
+              return h('div', {
                 key: editor.id,
+                className: 'dsh-editor-card-wrap',
+                style: { position: 'relative' },
+              },
+              h('button', {
                 type: 'button',
                 className: 'dsh-editor-card',
                 disabled: editor.available !== true || busy !== null,
@@ -1689,11 +1838,13 @@ let shortcutsService: any = null
                 onClick: () => { if (editor.available === true) void open(editor) },
                 style: {
                   ...editorCardStyle,
+                  width: '100%',
+                  paddingRight: isRunning ? '30px' : '10px',
                   cursor: editor.available === true ? 'pointer' : 'not-allowed',
                   opacity: editor.available === true ? 1 : 0.55,
                 },
               },
-              h('span', { style: { ...editorIconStyle, background: editor.color ?? '#6b7280' } }, editor.icon ?? editor.label.slice(0, 2)),
+              h('span', { style: editorIconStyle }, editor.icon ?? editor.label.slice(0, 2)),
               h('span', { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
                 h('span', { style: { fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, editor.label),
                 h('span', { style: editorMetaStyle },
@@ -1703,7 +1854,20 @@ let shortcutsService: any = null
                         : (editor.reason ?? t('editor.unavailable'))),
               ),
               h('span', { style: { width: '7px', height: '7px', flex: 'none', borderRadius: '50%', background: dot } }),
-              )
+              ),
+              isRunning
+                ? h('button', {
+                  type: 'button',
+                  className: 'dsh-editor-shutdown',
+                  title: t('editor.shutdown'),
+                  'aria-label': t('editor.shutdownLabel').replace('{label}', editor.label),
+                  disabled: busy !== null,
+                  onClick: (event) => {
+                    event.stopPropagation()
+                    void shutdown(editor.id)
+                  },
+                }, '\u23fb')
+                : null)
             })),
         h('div', { style: { marginTop: 'auto', ...editorMetaStyle } }, t('editor.hint')),
       )
@@ -1939,6 +2103,54 @@ let shortcutsService: any = null
         }, GlobalBar)),
         'dsh-enhance: global bar',
       )
+
+      // Bare `/enhance` opens the subcommand picker; a typed `/enhance <sub>`
+      // never reaches this decoration and goes straight to the host handler.
+      ctx.inject(['commandUi', 'sessions'], (scope) => {
+        const commandUi = scope.commandUi
+        const sessions = scope.sessions
+        const submit = async (session, line) => {
+          const live = sessions.binding(session.sessionId)?.session
+          if (live === undefined) throw new Error(t('command.noSession'))
+          const result = await live.command(line)
+          if (!result.ok) throw new Error(result.error.message)
+          if (!result.value.matched) throw new Error(t('command.noCommand'))
+        }
+        scope.effect(() => commandUi.decorate({
+          name: 'enhance',
+          available: () => true,
+          ui: {
+            kind: 'popupSelect',
+            searchLabels: () => ({
+              placeholder: t('command.search'),
+              empty: t('command.empty'),
+              noResults: t('command.noResults'),
+            }),
+            options: async () => [
+              { id: 'terminal', label: t('command.terminal'), detail: t('command.terminalDetail'), group: { name: 'open', label: t('command.groupOpen') } },
+              { id: 'editor', label: t('command.editor'), detail: t('command.editorDetail'), group: { name: 'open', label: t('command.groupOpen') } },
+              { id: 'status', label: t('command.status'), detail: t('command.statusDetail'), group: { name: 'host', label: t('command.groupHost') } },
+              { id: 'config', label: t('command.config'), detail: t('command.configDetail'), group: { name: 'host', label: t('command.groupHost') } },
+            ],
+            onSelect: (option, session) => {
+              if (option.id === 'terminal') {
+                return (async () => {
+                  await dockStore.refresh()
+                  const shell = dockStore.get().shells[0]?.path
+                  if (shell === undefined) throw new Error(t('dock.missingTtyd'))
+                  const created = await dockStore.create(shell)
+                  if (created !== undefined) addGlobalTab({ id: created.id, kind: 'terminal', title: created.title, url: created.url })
+                })()
+              }
+              if (option.id === 'editor') {
+                sidebarRight.openTab('editor')
+                return
+              }
+              return submit(session, `/enhance ${option.id}`)
+            },
+          },
+        }), 'dsh-enhance: /enhance decoration')
+      })
 
       const registerBrowser = (settings) => {
         let disposeShadow = null

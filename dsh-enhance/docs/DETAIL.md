@@ -105,7 +105,7 @@ A plugin cannot rewrite itself after a DSH upgrade. The replacement has an error
 
 ## Editor tab (right sidebar)
 
-An **Editor** tab type in the right sidebar, next to Files, Terminal and Browser. The guide card opens a picker; picking an editor starts it and shows it in the tab.
+An **Editor** tab type in the right sidebar, next to Files, Terminal and Browser. The guide card opens a picker. Nothing starts on its own: the tab shows the picker until you click an editor, and only then does a process start.
 
 ### Discovery
 
@@ -147,6 +147,9 @@ Cursor, Sublime Text and Zed have no web UI. They open on the desktop at the wor
 - **Workspace folder.** The tab resolves the Session's Workspace path and starts the editor there. Neovim gets it as its working directory, VS Code as `--default-folder`, native apps as their open path.
 - **Focus ring.** The right sidebar draws a green inset border while it contains keyboard focus.
 - **Key pass-through.** While the IDE iframe owns focus, the plugin puts DSH's shortcut layer into recording mode, so every key reaches the editor instead of being intercepted. Leaving the iframe restores shortcuts.
+- **On demand.** Opening the tab, reloading the page, or restoring the tab starts nothing. A process starts only when you click an editor card.
+- **Kept on close.** Closing the tab leaves the editor running. Reopening the tab shows the picker with that card marked **Running**; clicking it re-attaches to the same process instead of starting another.
+- **Shut down.** A running card shows a power button on hover (or keyboard focus) that stops that editor and its process group. The embedded view also carries **Switch editor** and **Shut down** in its header, so you can leave the iframe without killing it.
 - **One process per editor id**, at most five, reused when the tab reopens, killed with its process group when the plugin unloads.
 
 ### About noVNC on macOS
@@ -166,6 +169,23 @@ docker run -d -p 6080:6080 \
 ```
 
 That image serves noVNC at `http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale` with a minimal Xfce desktop. Install Sublime Text or Zed inside it (`docker exec`), then open the URL from the picker.
+
+## Slash command
+
+`/enhance` is a Host command with a client-side subcommand picker.
+
+- Bare `/enhance` (menu pick or Enter) opens a popup with **New terminal**, **Editor**, **Status**, and **Config**. New terminal opens a shell tab in the global bar; Editor opens the right-sidebar editor tab; Status and Config run on the Host.
+- Typed `/enhance <sub>` skips the popup and goes straight to the Host handler:
+
+| Subcommand | Effect |
+|---|---|
+| `status` | ttyd path, terminal count, available editors |
+| `terminal [shell]` | starts a terminal, returns its URL |
+| `editor [id]` | starts an editor, returns its URL or desktop-open note |
+| `stop <terminal\|editor> <id>` | stops that process |
+| `config` | prints the plugin configuration |
+
+The Host half registers the command only when a command registry is mounted, so a headless composition still loads the plugin. The client half decorates the Host row; it never manufactures one.
 
 ## Development
 

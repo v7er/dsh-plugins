@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Linear board",
+    "description": "Connect Linear, link projects to workspaces, sync issues into a local board, and start an agent session per task.",
+    "detail": "docs/DETAIL.md"
+  }
+}

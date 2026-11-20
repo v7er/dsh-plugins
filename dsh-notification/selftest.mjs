@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { apply } from './index.js'
+import { apply } from './index.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 rmSync(join(here, 'notifications.json'), { force: true })
@@ -20,6 +20,7 @@ const ctx = {
   },
   webServer: { register: () => () => {} },
   get: () => undefined,
+  inject: (_deps, cb) => cb({ effect: (fn) => fn(), commands: { register: () => () => {} } }),
 }
 
 apply(ctx)

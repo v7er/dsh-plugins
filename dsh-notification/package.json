@@ -5,13 +5,13 @@
   "type": "module",
   "description": "Notification bell above the account launcher, with a host service other plugins push to.",
   "exports": {
-    ".": "./index.js",
+    ".": "./index.ts",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
+    "index.ts",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -30,5 +30,12 @@
         "@deepseek-ai/dsh-client-ui-sidebar"
       ]
     }
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   }
 }

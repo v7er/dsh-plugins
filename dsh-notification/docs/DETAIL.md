@@ -43,3 +43,16 @@ The browser half reads and acts through two same-origin routes:
 - The browser polls every 5 seconds; there is no push channel.
 - A handler is registered in memory by the pushing plugin. After a Host restart, a notification whose plugin did not re-register its handler reports `this notification has no handler` instead of acting.
 - The list is a single JSON file, not a database. It is not meant for high volume.
+
+## Slash command
+
+`/notify` reads the bell from the composer:
+
+| Subcommand | Effect |
+|---|---|
+| `list` (default) | unread count plus the first 10 titles |
+| `read <id>` | marks one notification read |
+| `read all` | marks every notification read |
+| `dismiss <id>` | removes one notification |
+
+The Host registers it only when a command registry is mounted.

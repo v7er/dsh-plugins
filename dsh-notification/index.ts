@@ -22,6 +22,19 @@ const storePath = join(here, 'notifications.json')
 const MAX_ITEMS = 200
 const MAX_BODY_BYTES = 1_000_000
 
+/** The narrow `ctx.commands` face this plugin registers into. */
+interface CommandScope {
+  effect(fn: () => () => void, label?: string): () => void
+  commands: {
+    register(definition: {
+      name: string
+      description: string
+      input?: { hint: string }
+      handler(invocation: { rawInput: string }): { kind: 'success' | 'error'; text: string }
+    }): () => void
+  }
+}
+
 function readItems() {
   try {
     const parsed = JSON.parse(readFileSync(storePath, 'utf8'))
@@ -45,7 +58,7 @@ function sendJson(res, status, body) {
   res.end(data)
 }
 
-function readJson(req) {
+function readJson(req): Promise<any> {
   return new Promise((resolve, reject) => {
     let raw = ''
     req.on('data', (chunk) => {
@@ -81,7 +94,7 @@ export function apply(ctx) {
      * @param input - title, body, kind, source, actions, or an options choice.
      * @returns the notification id.
      */
-    push(input = {}) {
+    push(input: any = {}) {
       const item = {
         id: typeof input.id === 'string' && input.id !== '' ? input.id : randomUUID(),
         title: String(input.title ?? ''),
@@ -200,4 +213,41 @@ export function apply(ctx) {
       }
     },
   }), 'dsh-notification: act route')
+
+  const commandHandler = ({ rawInput }: { rawInput: string }): { kind: 'success' | 'error'; text: string } => {
+    const parts = rawInput.trim().split(/\s+/).filter((part) => part !== '')
+    const sub = parts[0] ?? 'list'
+    if (sub === 'list') {
+      const { items, unread } = service.list()
+      if (items.length === 0) return { kind: 'success', text: 'No notifications.' }
+      const lines = items.slice(0, 10).map((item) => `${item.read ? ' ' : '•'} ${item.title || item.id} [${item.kind}]`)
+      return { kind: 'success', text: `${unread} unread of ${items.length}\n${lines.join('\n')}` }
+    }
+    if (sub === 'read') {
+      if (parts[1] === 'all') {
+        service.readAll()
+        return { kind: 'success', text: 'All notifications marked read.' }
+      }
+      if (parts[1] === undefined) return { kind: 'error', text: 'Usage: /notify read <id|all>' }
+      return service.read(parts[1])
+        ? { kind: 'success', text: `Marked ${parts[1]} read.` }
+        : { kind: 'error', text: `No notification ${parts[1]}.` }
+    }
+    if (sub === 'dismiss') {
+      if (parts[1] === undefined) return { kind: 'error', text: 'Usage: /notify dismiss <id>' }
+      service.dismiss(parts[1])
+      return { kind: 'success', text: `Dismissed ${parts[1]}.` }
+    }
+    return { kind: 'error', text: 'Subcommands: list, read <id|all>, dismiss <id>' }
+  }
+
+  // Optional: a headless composition has no command registry, and the plugin still works.
+  ctx.inject(['commands'], (scope: CommandScope) => {
+    scope.effect(() => scope.commands.register({
+      name: 'notify',
+      description: 'List, read, or dismiss notifications',
+      input: { hint: '<list|read|dismiss>' },
+      handler: commandHandler,
+    }), 'dsh-notification: /notify command')
+  })
 }

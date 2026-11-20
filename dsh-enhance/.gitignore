@@ -1,2 +1,5 @@
 dist
 node_modules
+flow.db
+flow.db-wal
+flow.db-shm

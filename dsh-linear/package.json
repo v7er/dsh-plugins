@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Link workspaces to Linear projects, sync issues into a local SQLite board, and start an agent session per task.",
+  "description": "Link workspaces to Linear projects, sync issues into local boards, and run a review-first agent workflow.",
   "exports": {
-    ".": "./index.js",
+    ".": "./index.ts",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
+    "index.ts",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -31,5 +31,12 @@
         "@deepseek-ai/dsh-client-ui-sidebar"
       ]
     }
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   }
 }

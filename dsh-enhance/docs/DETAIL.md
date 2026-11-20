@@ -1,11 +1,12 @@
 # dsh-enhance
 
-Four additions to the Web/Desktop client:
+Five additions to the Web/Desktop client:
 
 1. **Global bar** — a bottom bar with persistent multi-shell terminals and a two-pane split. It stays mounted across sessions.
-2. **Workspace browser with icons and badges** — replaces the shipped `sidebar.workspaces` browser with a compact list that reads `badges.json`.
-3. **Virtual groups** — group workspaces under named folders from `groups.json`.
-4. **Editor tab** — a right-sidebar tab that runs Neovim through `ttyd`, or embeds any noVNC desktop.
+2. **Status bar** — a Neovim-style session line above the global bar, with configurable segments.
+3. **Workspace browser with icons and badges** — replaces the shipped `sidebar.workspaces` browser with a compact list that reads `badges.json`. The focused session and its workspace are highlighted.
+4. **Virtual groups** — group workspaces under named folders from `groups.json`.
+5. **Editor tab** — a right-sidebar tab that runs Neovim through `ttyd`, or embeds any noVNC desktop.
 
 ## Feature toggles
 
@@ -15,6 +16,12 @@ Open **Settings → dsh-enhance** and use the switches. They write `config.json`
 {
   "customLeftbar": true,
   "globalBar": true,
+  "statusbar": true,
+  "statusbarSegments": {
+    "left": ["session"],
+    "center": ["cwd"],
+    "right": ["status", "time"]
+  },
   "virtualGroups": true,
   "splitPanes": true
 }
@@ -22,10 +29,25 @@ Open **Settings → dsh-enhance** and use the switches. They write `config.json`
 
 - `customLeftbar: false` → shipped workspace browser returns.
 - `globalBar: false` → no bottom global bar.
+- `statusbar: false` → no status line.
 - `virtualGroups: false` → flat workspace list.
 - `splitPanes: false` → no split button.
 
 Reload the page after changing a switch.
+
+## Status bar
+
+- Sits above the global bar, full width, one line.
+- Shows the focused session, its working directory, its status, and when it last changed.
+- Segments are data. `statusbarSegments` maps each section to an ordered list of ids:
+  - `session` — session title.
+  - `cwd` — session working directory, a link that reveals the folder in the file manager.
+  - `workspace` — workspace title or path.
+  - `status` — running, waiting, done, or idle.
+  - `time` — relative last update.
+- Unknown ids are ignored. Empty sections collapse.
+- Add a segment by extending `statusbarSegments` and the `segmentNodes` map in `src/client.ts`.
+- The bar hides while a global panel (not a session) is active, because there is no focused session.
 
 ## Global bar
 

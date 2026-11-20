@@ -6,6 +6,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { createServer, connect } from 'node:net'
 import { createServer as createHttpServer, request } from 'node:http'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -172,7 +173,7 @@ function readJson(req: any): Promise<any> {
     let body = ''
     req.on('data', (chunk) => {
       body += chunk
-      if (body.length > 1_000_000) req.destroy()
+      if (body.length > 8_000_000) req.destroy()
     })
     req.on('end', () => {
       try {
@@ -199,6 +200,32 @@ export function apply(ctx: any, config: any = {}) {
   const here = dirname(fileURLToPath(import.meta.url))
   const rootDir = existsSync(join(here, 'config.json')) ? here : join(here, '..')
   const configPath = join(rootDir, 'config.json')
+  const flowDbPath = join(rootDir, 'flow.db')
+  let flowDb: DatabaseSync | undefined
+  const openFlowDb = (): DatabaseSync => {
+    if (flowDb !== undefined) return flowDb
+    flowDb = new DatabaseSync(flowDbPath)
+    flowDb.exec(`
+      PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS flow_events (
+        session_id TEXT NOT NULL,
+        turn INTEGER NOT NULL,
+        step INTEGER NOT NULL,
+        id TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        title TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        status TEXT NOT NULL,
+        meta TEXT,
+        time INTEGER,
+        seq INTEGER,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (session_id, turn, id)
+      );
+      CREATE INDEX IF NOT EXISTS flow_events_turn ON flow_events(session_id, turn);
+    `)
+    return flowDb
+  }
   const readRaw = () => {
     try {
       return JSON.parse(readFileSync(configPath, 'utf8'))
@@ -212,6 +239,10 @@ export function apply(ctx: any, config: any = {}) {
       ...raw,
       customLeftbar: raw.customLeftbar !== false,
       globalBar: raw.globalBar !== false,
+      statusbar: raw.statusbar !== false,
+      statusbarSegments: raw.statusbarSegments !== null && typeof raw.statusbarSegments === 'object'
+        ? raw.statusbarSegments
+        : { left: ['session'], center: ['cwd'], right: ['status', 'time'] },
       virtualGroups: raw.virtualGroups !== false,
       splitPanes: raw.splitPanes !== false,
     }
@@ -730,6 +761,90 @@ export function apply(ctx: any, config: any = {}) {
     },
   }), 'dsh-enhance: config route')
   jsonFileRoute('/dsh-enhance/groups', groupsPath, { groups: [] })
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/dsh-enhance/flow',
+    handler: async (req, res) => {
+      try {
+        const db = openFlowDb()
+        if (req.method === 'GET') {
+          const url = new URL(req.url ?? '/', 'http://localhost')
+          const sessionId = url.searchParams.get('sessionId') ?? ''
+          const turnParam = url.searchParams.get('turn')
+          if (turnParam === null) {
+            const rows = db.prepare('SELECT DISTINCT turn FROM flow_events WHERE session_id = ? ORDER BY turn ASC').all(sessionId)
+            sendJson(res, 200, { turns: rows.map((row: any) => row.turn) })
+            return
+          }
+          const turn = Number(turnParam)
+          if (!Number.isFinite(turn)) {
+            sendJson(res, 400, { error: 'turn required' })
+            return
+          }
+          const rows = db.prepare('SELECT id, turn, step, phase, title, detail, status, meta, time, seq FROM flow_events WHERE session_id = ? AND turn = ? ORDER BY step ASC, seq ASC, id ASC').all(sessionId, turn)
+          sendJson(res, 200, { events: rows })
+          return
+        }
+        if (req.method === 'POST') {
+          const body = await readJson(req)
+          const sessionId = typeof body.sessionId === 'string' ? body.sessionId : ''
+          const turn = Number(body.turn)
+          const events = Array.isArray(body.events) ? body.events : []
+          if (sessionId === '' || !Number.isFinite(turn)) {
+            sendJson(res, 400, { error: 'sessionId and turn required' })
+            return
+          }
+          const statement = db.prepare(`
+            INSERT INTO flow_events (session_id, turn, step, id, phase, title, detail, status, meta, time, seq, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, turn, id) DO UPDATE SET
+              step = excluded.step,
+              phase = excluded.phase,
+              title = excluded.title,
+              detail = excluded.detail,
+              status = excluded.status,
+              meta = excluded.meta,
+              time = excluded.time,
+              seq = excluded.seq,
+              updated_at = excluded.updated_at
+          `)
+          const now = Date.now()
+          db.exec('BEGIN')
+          try {
+            for (const event of events) {
+              if (event === null || typeof event !== 'object') continue
+              if (typeof event.id !== 'string' || event.id === '') continue
+              statement.run(
+                sessionId,
+                turn,
+                Number.isFinite(event.step) ? event.step : 1,
+                event.id,
+                typeof event.phase === 'string' ? event.phase : 'other',
+                typeof event.title === 'string' ? event.title : '',
+                typeof event.detail === 'string' ? event.detail : '',
+                typeof event.status === 'string' ? event.status : 'idle',
+                typeof event.meta === 'string' ? event.meta : null,
+                Number.isFinite(event.time) ? event.time : null,
+                Number.isFinite(event.seq) ? event.seq : null,
+                now,
+              )
+            }
+            db.exec('COMMIT')
+          } catch (error) {
+            db.exec('ROLLBACK')
+            throw error
+          }
+          sendJson(res, 200, { ok: true, count: events.length })
+          return
+        }
+        sendJson(res, 405, { error: 'method not allowed' })
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) })
+      }
+    },
+  }), 'dsh-enhance: flow route')
+
 
   ctx.effect(() => () => {
     for (const id of [...terminals.keys()]) close(id)

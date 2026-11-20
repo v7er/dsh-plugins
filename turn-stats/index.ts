@@ -161,9 +161,9 @@ function costOf(usage) {
  */
 function priced(turn) {
   const phases = {}
-  for (const [phase, bucket] of Object.entries(turn.phases)) {
+  for (const [phase, bucket] of Object.entries(turn.phases as Record<string, any>)) {
     const tools = {}
-    for (const [name, stat] of Object.entries(bucket.tools ?? {})) {
+    for (const [name, stat] of Object.entries((bucket.tools ?? {}) as Record<string, any>)) {
       tools[name] = { ...stat, tokens: billable(stat), costUsd: costOf(stat) }
     }
     const callLog = (bucket.callLog ?? []).map((call) => ({ ...call, tokens: billable(call), costUsd: costOf(call) }))
@@ -583,14 +583,14 @@ function trimCalls(state, currentTurn) {
   const cutoff = currentTurn - CALL_TURN_WINDOW
   let changed = false
   const turns = {}
-  for (const [key, turn] of Object.entries(state.turns)) {
+  for (const [key, turn] of Object.entries(state.turns as Record<string, any>)) {
     if (Number(key) >= cutoff) {
       turns[key] = turn
       continue
     }
     let touched = false
     const phases = {}
-    for (const [name, bucket] of Object.entries(turn.phases)) {
+    for (const [name, bucket] of Object.entries(turn.phases as Record<string, any>)) {
       if (Array.isArray(bucket.callLog) && bucket.callLog.length > 0) {
         phases[name] = { ...bucket, callLog: [] }
         touched = true
@@ -819,6 +819,69 @@ const turnStatsProjection = {
  * Register the unit; the registration is an effect on this fiber.
  * @param {object} ctx - host context carrying the projection registry.
  */
+/** The narrow `ctx.commands` face this plugin registers into. */
+interface CommandScope {
+  effect(fn: () => () => void, label?: string): () => void
+  commands: {
+    register(definition: {
+      name: string
+      description: string
+      input?: { hint: string }
+      handler(invocation: { rawInput: string }): { kind: 'success' | 'error'; text: string }
+    }): () => void
+  }
+}
+
+const commandHandler = ({ rawInput }: { rawInput: string }): { kind: 'success' | 'error'; text: string } => {
+  const parts = rawInput.trim().split(/\s+/).filter((part) => part !== '')
+  const sub = parts[0] ?? 'prices'
+  if (sub === 'prices') {
+    return {
+      kind: 'success',
+      text: [
+        `input $${PRICE.input}/M`,
+        `cache read $${PRICE.cacheRead}/M`,
+        `cache write $${PRICE.cacheWrite}/M`,
+        `output $${PRICE.output}/M`,
+      ].join('\n'),
+    }
+  }
+  if (sub === 'cost') {
+    const input = Number(parts[1] ?? 0)
+    const output = Number(parts[2] ?? 0)
+    const cacheRead = Number(parts[3] ?? 0)
+    const cacheWrite = Number(parts[4] ?? 0)
+    if (![input, output, cacheRead, cacheWrite].every(Number.isFinite)) {
+      return { kind: 'error', text: 'Usage: /stats cost <input> <output> [cacheRead] [cacheWrite]' }
+    }
+    const total = costOf({
+      inputTokens: input,
+      outputTokens: output,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+    })
+    return {
+      kind: 'success',
+      text: `${input} in + ${output} out + ${cacheRead} cache read + ${cacheWrite} cache write ≈ $${total.toFixed(4)}`,
+    }
+  }
+  return { kind: 'error', text: 'Subcommands: prices, cost <input> <output> [cacheRead] [cacheWrite]' }
+}
+
+/**
+ * Register the unit; the registration is an effect on this fiber.
+ * @param ctx - host context carrying the projection registry.
+ */
 export function apply(ctx) {
   ctx.sessionProjections.register(turnStatsProjection)
+
+  // Optional: a headless composition has no command registry, and the plugin still works.
+  ctx.inject(['commands'], (scope: CommandScope) => {
+    scope.effect(() => scope.commands.register({
+      name: 'stats',
+      description: 'Show turn-stats prices or estimate a cost',
+      input: { hint: '<prices|cost>' },
+      handler: commandHandler,
+    }), 'turn-stats: /stats command')
+  })
 }

@@ -4,17 +4,19 @@ Workspace root: `/Users/tuevo/.dsh/plugins`. One git repo, five independent plug
 
 | Package | Entry | Language today |
 | --- | --- | --- |
-| `dsh-enhance` | `src/index.ts`, `src/client.ts` | TypeScript |
-| `dsh-linear` | `index.js`, `client.js` | JavaScript (legacy) |
-| `dsh-notification` | `index.js`, `client.js` | JavaScript (legacy) |
+| `dsh-enhance` | `src/index.ts`, `src/client.ts` | TypeScript, built by Vite |
+| `dsh-linear` | `index.ts`, `client.js` | TypeScript host, JS client |
+| `dsh-notification` | `index.ts`, `client.js` | TypeScript host, JS client |
 | `simsa` | `index.js` | JavaScript (legacy) |
-| `turn-stats` | `index.js`, `client.js` | JavaScript (legacy) |
+| `turn-stats` | `index.ts`, `client.js` | TypeScript host, JS client |
 
 ## Design system
 
 Read `DESIGN.md` before any change that renders UI. It is the standard for every plugin
 with a client half: host `--dsw-*` tokens only, 4px spacing, the host type scale, one
-elevation per surface, keyboard and dark-mode parity, locale-routed strings.
+elevation per surface, keyboard and dark-mode parity, locale-routed strings. The
+workspace accent is the notification green (`--dsw-alias-state-success-primary`); see
+`DESIGN.md` § Accent.
 
 The reference model is [Astryx](https://astryx.atmeta.com/). Use it for component
 semantics and states, never as a dependency: `@astryxdesign/*` is not whitelisted and
@@ -28,6 +30,7 @@ would duplicate the host theme.
 - Every change must pass `tsc --noEmit` in the package it touches.
 - No `@ts-ignore` / `@ts-expect-error` without a one-line reason on the same line.
 - Types come from the code, not from `any`. If a DSH host type is missing, declare the narrow shape you use.
+- Host halves ship `.ts` and point `exports["."]` at `./index.ts`: Node 24 strips types, so no build step. Client halves stay `.js` because the browser cannot strip types; only `dsh-enhance` builds its client with Vite.
 
 ## Package whitelist
 
@@ -39,6 +42,7 @@ Install only from this list. Node built-ins (`node:*`) are always allowed and ar
 | `vite` | dev | client/host bundling |
 | `@types/node` | dev | Node types |
 | `@types/react` | dev | React types |
+| `@xyflow/react` | dev | 2026-11-19: realtime turn graph canvas in the Flow view; MIT, bundled into the client |
 | `react` | host-provided | DSH client runtime; never install |
 | `@deepseek-ai/dsh-*` | host-provided | DSH plugin API; never install |
 
@@ -78,13 +82,70 @@ trail callers <symbol>               # who calls it; --direction out for callees
 
 After large code changes: `trail build .`. Save a hard-won fact: `trail note "<learning>"`.
 
+## Slash commands
+
+Every plugin exposes its actions as one Host slash command with subcommands. The Web GUI's `/` menu lists it automatically; the menu itself needs no client code.
+
+- Register through `ctx.inject(['commands'], ...)`, never a hard `inject` entry. A headless composition has no registry and must still load.
+- One command per plugin, named after the plugin: `/enhance`, `/linear`, `/notify`, `/stats`, `/simsa`.
+- `input.hint` lists the subcommands: `'<status|sync|tasks>'`.
+- The registry has no subcommand concept. Everything after the name arrives as `rawInput`; parse it yourself.
+- Return `{ kind: 'success' | 'error', text }`. Never throw for user input.
+- An empty or unknown subcommand returns an error that lists the valid ones.
+
+```ts
+/** The narrow `ctx.commands` face this plugin registers into. */
+interface CommandScope {
+  effect(fn: () => () => void, label?: string): () => void
+  commands: {
+    register(definition: {
+      name: string
+      description: string
+      input?: { hint: string }
+      handler(invocation: { rawInput: string }): { kind: 'success' | 'error'; text: string }
+    }): () => void
+  }
+}
+
+ctx.inject(['commands'], (scope: CommandScope) => {
+  scope.effect(() => scope.commands.register({
+    name: 'notify',
+    description: 'List, read, or dismiss notifications',
+    input: { hint: '<list|read|dismiss>' },
+    handler: ({ rawInput }) => {
+      const parts = rawInput.trim().split(/\s+/).filter((part) => part !== '')
+      const sub = parts[0] ?? 'list'
+      // ...
+      return { kind: 'error', text: 'Subcommands: list, read <id|all>, dismiss <id>' }
+    },
+  }), 'dsh-notification: /notify command')
+})
+```
+
+Client popup, only when the plugin has a client half:
+
+- `ctx.commandUi.decorate({ name, available, ui: { kind: 'popupSelect', options, onSelect } })` hangs a picker on the Host row's bare invocation.
+- A decoration never creates a row: the Host command must exist first.
+- Typed `/cmd <sub>` skips the decoration and goes to the Host handler.
+- `ctx.commandUi.register` makes a client-only command, but an argued line then falls through to the model as a prompt. Prefer a Host row.
+- `dsh-enhance` is the reference: Host command in `src/index.ts`, decoration in `src/client.ts`.
+
 ## Verify before done
 
 ```bash
-cd dsh-enhance && npx tsc --noEmit && npm run build
+cd /Users/tuevo/.dsh/plugins
+(cd dsh-enhance && npx tsc --noEmit && npm run build)
+for p in dsh-linear dsh-notification turn-stats; do (cd $p && npx tsc --noEmit); done
 ```
 
-Other packages have no build script yet. When you convert one, add `"typecheck": "tsc --noEmit"` and run it.
+Every converted package carries `"typecheck": "tsc --noEmit"`. A `.ts` entry also needs a load check from the profile directory, which exercises exports resolution, the symlink, and Node type stripping:
+
+```bash
+cd /Users/tuevo/.dsh/profiles/desktop
+ELECTRON_RUN_AS_NODE=1 "$DSH_NODE_EXECUTABLE" -e "import('@local/dsh-linear').then(m => console.log(Object.keys(m)))"
+```
+
+A Host change needs an app restart: HMR runs with `root: []`, so plugin modules are not watched.
 
 ## Rules that override defaults
 

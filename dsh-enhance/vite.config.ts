@@ -33,6 +33,9 @@ function dshClientWrapper(): Plugin {
 
 export default defineConfig({
   plugins: [dshClientWrapper()],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -44,7 +47,7 @@ export default defineConfig({
       fileName: () => 'client.js',
     },
     rollupOptions: {
-      external: ['react'],
+      external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     },
   },
 })

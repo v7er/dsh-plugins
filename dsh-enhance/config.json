@@ -1,6 +1,12 @@
 {
   "customLeftbar": true,
   "globalBar": true,
+  "statusbar": true,
+  "statusbarSegments": {
+    "left": ["session"],
+    "center": ["cwd"],
+    "right": ["status", "time"]
+  },
   "virtualGroups": true,
   "splitPanes": true,
   "editors": [

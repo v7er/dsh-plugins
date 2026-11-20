@@ -5,13 +5,13 @@
   "type": "module",
   "description": "Status bar under every finished reply: skill, tokens, context file, cost, per-phase token split with cache hits, and prompt-context growth. Click for the full record; expand a phase to see each tool and command with its own tokens, cost and duration, then press Why for the computed reason the phase was expensive or Ask AI to hand a compact prompt about that phase to the composer.",
   "exports": {
-    ".": "./index.js",
+    ".": "./index.ts",
     "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
+    "index.ts",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -28,5 +28,12 @@
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
   }
 }

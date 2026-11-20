@@ -1,4 +1,5 @@
 import React from 'react'
+import { FlowView } from './flow-view'
 
 const h: any = React.createElement
 const NS = 'dshEnhance'
@@ -6,6 +7,7 @@ const API = '/dsh-enhance/terminals'
 let sidebarRight: any = null
 let workspacesService: any = null
 let shortcutsService: any = null
+let layoutService: any = null
 
     const en = {
       'meta.title': 'Terminal and workspace',
@@ -37,6 +39,15 @@ let shortcutsService: any = null
       'settings.splitPanes': 'Split panes',
       'settings.splitPanesHint': 'Allow two panes in the global bar.',
       'settings.reload': 'Reload the page to apply changes.',
+      'settings.statusbar': 'Status bar',
+      'settings.statusbarHint': 'Session status line above the global bar. Segments: config.json statusbarSegments.',
+      'statusbar.label': 'Session status',
+      'statusbar.openPath': 'Open folder',
+      'statusbar.noSession': 'No session',
+      'statusbar.running': 'Running',
+      'statusbar.waiting': 'Waiting',
+      'statusbar.done': 'Done',
+      'statusbar.idle': 'Idle',
       'browser.title': 'Workspaces',
       'browser.search': 'Search workspaces',
       'browser.newSession': 'New session',
@@ -50,7 +61,9 @@ let shortcutsService: any = null
       'browser.collapseAll': 'Collapse all (keep running)',
       'browser.more': 'More',
       'browser.changeIcon': 'Change icon',
+      'browser.moveTo': 'Move to {group}',
       'browser.empty': 'No workspaces',
+      'header.back': 'Back to the previous panel',
       'editor.card': 'Editor',
       'editor.cardHint': 'Neovim, VS Code, or a noVNC desktop in the right sidebar.',
       'editor.title': 'Editor',
@@ -70,6 +83,62 @@ let shortcutsService: any = null
       'editor.type.novnc': 'noVNC',
       'editor.type.native': 'desktop app',
       'editor.hint': 'Sublime Text, Zed and Cursor have no web UI; add a noVNC URL in config.json to embed them.',
+      'flow.title': 'Flow',
+      'flow.turn': 'Turn {turn}',
+      'flow.plan': 'Plan',
+      'flow.planning': 'Planning',
+      'flow.verify': 'Verify',
+      'flow.work': 'Work',
+      'flow.noPlan': 'No plan recorded',
+      'flow.thinking': 'Thinking',
+      'flow.response': 'Response',
+      'flow.tool': 'Tool',
+      'flow.user': 'You',
+      'flow.steering': 'Steering',
+      'flow.context': 'Context',
+      'flow.error': 'Error',
+      'flow.compaction': 'Compaction',
+      'flow.command': 'Command',
+      'flow.retry': 'Retry',
+      'flow.running': 'Running',
+      'flow.done': 'Done',
+      'flow.failed': 'Failed',
+      'flow.live': 'Live',
+      'flow.waiting': 'Waiting for the turn',
+      'flow.empty': 'No turn yet',
+      'flow.emptyHint': 'Send a prompt. Thinking, plan, tool calls, and the response appear here as they happen.',
+      'flow.unavailable': 'Trajectory data unavailable',
+      'flow.unavailableHint': 'The built-in Trajectory view is not loaded in this profile.',
+      'flow.controls': 'Graph controls',
+      'flow.zoomIn': 'Zoom in',
+      'flow.zoomOut': 'Zoom out',
+      'flow.fitView': 'Fit graph',
+      'flow.node': 'Turn event',
+      'flow.edge': 'Event link',
+      'flow.clarify': 'Clarify / verify',
+      'flow.problem': 'Problem {label}',
+      'flow.phase.capture': 'Capture',
+      'flow.phase.thinking': 'Thinking',
+      'flow.phase.verify': 'Verify',
+      'flow.phase.planning': 'Planning',
+      'flow.phase.coding': 'Coding',
+      'flow.phase.testing': 'Testing',
+      'flow.phase.response': 'Resolve',
+      'flow.phase.tools': 'Tools',
+      'flow.phase.other': 'Other',
+      'flow.prompt': 'Prompt',
+      'flow.noPrompt': 'No prompt recorded',
+      'flow.noDetail': 'No detail recorded',
+      'flow.pending': 'Pending',
+      'flow.streaming': 'Streaming',
+      'flow.interrupted': 'Interrupted',
+      'flow.args': 'Arguments',
+      'flow.result': 'Result',
+      'flow.detail': 'Detail',
+      'flow.close': 'Close detail',
+      'flow.task': 'Task',
+      'flow.selectTurn': 'Select turn',
+      'flow.mock': 'Mock',
       'command.search': 'Search subcommands',
       'command.empty': 'No subcommands',
       'command.noResults': 'No matching subcommand',
@@ -117,6 +186,15 @@ let shortcutsService: any = null
       'settings.splitPanes': '分屏',
       'settings.splitPanesHint': '允许全局栏显示两个窗格。',
       'settings.reload': '重新加载页面以应用更改。',
+      'settings.statusbar': '状态栏',
+      'settings.statusbarHint': '全局栏上方的会话状态行。分段配置见 config.json 的 statusbarSegments。',
+      'statusbar.label': '会话状态',
+      'statusbar.openPath': '打开文件夹',
+      'statusbar.noSession': '没有会话',
+      'statusbar.running': '运行中',
+      'statusbar.waiting': '等待中',
+      'statusbar.done': '完成',
+      'statusbar.idle': '空闲',
       'browser.title': '工作区',
       'browser.search': '搜索工作区',
       'browser.newSession': '新建会话',
@@ -130,7 +208,9 @@ let shortcutsService: any = null
       'browser.collapseAll': '全部收起（保留运行中）',
       'browser.more': '更多',
       'browser.changeIcon': '更换图标',
+      'browser.moveTo': '移动到 {group}',
       'browser.empty': '没有工作区',
+      'header.back': '返回上一个面板',
       'editor.card': '编辑器',
       'editor.cardHint': '在右侧栏中运行 Neovim、VS Code 或 noVNC 桌面应用。',
       'editor.title': '编辑器',
@@ -150,6 +230,62 @@ let shortcutsService: any = null
       'editor.type.novnc': 'noVNC',
       'editor.type.native': '桌面应用',
       'editor.hint': 'Sublime Text、Zed 和 Cursor 没有网页版；在 config.json 中添加 noVNC 地址即可嵌入。',
+      'flow.title': '流程',
+      'flow.turn': '第 {turn} 轮',
+      'flow.plan': '计划',
+      'flow.planning': '计划',
+      'flow.verify': '验证',
+      'flow.work': '工作',
+      'flow.noPlan': '没有记录计划',
+      'flow.thinking': '思考',
+      'flow.response': '回复',
+      'flow.tool': '工具',
+      'flow.user': '你',
+      'flow.steering': '插话',
+      'flow.context': '上下文',
+      'flow.error': '错误',
+      'flow.compaction': '压缩',
+      'flow.command': '命令',
+      'flow.retry': '重试',
+      'flow.running': '运行中',
+      'flow.done': '完成',
+      'flow.failed': '失败',
+      'flow.live': '实时',
+      'flow.waiting': '等待本轮开始',
+      'flow.empty': '还没有轮次',
+      'flow.emptyHint': '发送提示后，思考、计划、工具调用和回复会实时出现在这里。',
+      'flow.unavailable': '轨迹数据不可用',
+      'flow.unavailableHint': '当前配置没有加载内置的轨迹视图。',
+      'flow.controls': '图表控制',
+      'flow.zoomIn': '放大',
+      'flow.zoomOut': '缩小',
+      'flow.fitView': '适应图表',
+      'flow.node': '轮次事件',
+      'flow.edge': '事件连线',
+      'flow.clarify': '澄清 / 验证',
+      'flow.problem': '问题 {label}',
+      'flow.phase.capture': '捕获',
+      'flow.phase.thinking': '思考',
+      'flow.phase.verify': '验证',
+      'flow.phase.planning': '计划',
+      'flow.phase.coding': '编码',
+      'flow.phase.testing': '测试',
+      'flow.phase.response': '解决',
+      'flow.phase.tools': '工具',
+      'flow.phase.other': '其他',
+      'flow.prompt': '提示',
+      'flow.noPrompt': '没有记录提示',
+      'flow.noDetail': '没有记录详情',
+      'flow.pending': '待处理',
+      'flow.streaming': '流式输出',
+      'flow.interrupted': '已中断',
+      'flow.args': '参数',
+      'flow.result': '结果',
+      'flow.detail': '详情',
+      'flow.close': '关闭详情',
+      'flow.task': '任务',
+      'flow.selectTurn': '选择轮次',
+      'flow.mock': '模拟',
       'command.search': '搜索子命令',
       'command.empty': '没有子命令',
       'command.noResults': '没有匹配的子命令',
@@ -333,6 +469,134 @@ let shortcutsService: any = null
     })()
 
     const featureConfig = { splitPanes: true, globalBar: true }
+
+    // Status line config is data, not code: segments are ids rendered in order.
+    // Add a segment by extending `statusbarSegments` and `segmentNodes` below.
+    const statusbarStore = (() => {
+      let state: any = { enabled: true, left: ['session'], center: ['cwd'], right: ['status', 'time'] }
+      const listeners = new Set<() => void>()
+      const emit = () => { for (const listener of listeners) listener() }
+      const set = (patch) => { state = { ...state, ...patch }; emit() }
+      return {
+        get: () => state,
+        subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
+        set,
+      }
+    })()
+
+    const statusbarStyle = {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      height: '24px',
+      flex: 'none',
+      padding: '0 12px',
+      borderTop: '1px solid var(--dsw-alias-border-l1)',
+      background: 'var(--dsw-alias-bg-layer-2)',
+      color: 'var(--dsw-alias-label-secondary)',
+      font: 'inherit',
+      fontSize: '11px',
+      lineHeight: '16px',
+      fontVariantNumeric: 'tabular-nums',
+    }
+
+    const statusbarSectionStyle = {
+      flex: '1',
+      minWidth: 0,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    }
+
+    const statusbarSeparatorStyle = { opacity: 0.5, padding: '0 6px' }
+
+    const statusbarCss = `
+      .dsh-enhance-statusbar-link {
+        max-width: 100%;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: var(--dsw-alias-link);
+        font: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .dsh-enhance-statusbar-link:hover { color: var(--dsw-alias-label-primary); }
+      .dsh-enhance-statusbar-link:focus-visible {
+        outline: 2px solid var(--dsw-alias-state-business-primary);
+        outline-offset: 1px;
+        border-radius: var(--dsw-radius-xs);
+      }
+    `
+
+    const statusColor = (kind) => kind === 'running'
+      ? 'var(--dsw-alias-state-business-primary)'
+      : kind === 'waiting'
+        ? 'var(--dsw-alias-state-warn-primary)'
+        : kind === 'done'
+          ? 'var(--dsw-alias-state-success-primary)'
+          : 'var(--dsw-alias-label-secondary)'
+
+    function StatusBar({ t, useSessions, usePanelInfo, useWorkspaces, useSessionStatus, openPath }) {
+      const config = React.useSyncExternalStore(statusbarStore.subscribe, statusbarStore.get)
+      const panelActive = usePanelInfo((info) => info.activePanelId !== null)
+      const sessions = useSessions((state) => state)
+      const workspaces = useWorkspaces((state) => state.items)
+      const statuses = useSessionStatus((state) => state)
+      if (config.enabled === false) return null
+      const currentId = panelActive
+        ? undefined
+        : (Object.values(sessions.byId) as any[]).find((session) => (session.retainedBy?.mainView ?? 0) > 0)?.id
+      const summary = currentId === undefined ? undefined : sessions.byId[currentId]
+      const workspace = currentId === undefined
+        ? undefined
+        : workspaces.find((item) => Array.isArray(item.sessionIds) && item.sessionIds.includes(currentId))
+      const kind = statusKind(statuses.get(currentId))
+      const cwd = typeof summary?.cwd === 'string' && summary.cwd !== '' ? summary.cwd : ''
+      const segmentNodes = {
+        session: summary === undefined ? t('statusbar.noSession') : String(summary.displayTitle ?? currentId),
+        workspace: workspace === undefined ? '' : String(workspace.title || workspace.path),
+        cwd: cwd === ''
+          ? ''
+          : h('button', {
+              type: 'button',
+              className: 'dsh-enhance-statusbar-link',
+              title: t('statusbar.openPath'),
+              'aria-label': t('statusbar.openPath') + ': ' + cwd,
+              onClick: () => {
+                if (typeof openPath === 'function') void openPath(cwd)
+              },
+            }, cwd),
+        status: currentId === undefined
+          ? ''
+          : h('span', { style: { color: statusColor(kind) } }, t('statusbar.' + kind)),
+        time: summary === undefined ? '' : relativeTime(summary.updatedAt),
+      }
+      const renderSection = (ids, align) => {
+        const parts = (Array.isArray(ids) ? ids : [])
+          .map((id) => ({ id, node: segmentNodes[id] }))
+          .filter((part) => part.node !== undefined && part.node !== '')
+        return h('span', { style: { ...statusbarSectionStyle, textAlign: align } },
+          parts.map((part, index) => h(React.Fragment, { key: part.id + ':' + index },
+            index === 0 ? null : h('span', { style: statusbarSeparatorStyle }, '│'),
+            part.node,
+          )))
+      }
+      return h('div', { style: statusbarStyle, role: 'status', 'aria-label': t('statusbar.label') },
+        h('style', null, statusbarCss),
+        renderSection(config.left, 'left'),
+        renderSection(config.center, 'center'),
+        renderSection(config.right, 'right'),
+      )
+    }
+
+    function BottomBar(props) {
+      return h(React.Fragment, null, h(StatusBar, props), h(GlobalBar, props))
+    }
 
     const addGlobalTab = (tab) => {
       const state = globalStore.get()
@@ -1199,21 +1463,38 @@ let shortcutsService: any = null
 
     function ShadowBrowser(props) {
       const {
-        wide, expandSidebar, useWorkspaces, useSessions, useSessionStatus, t,
+        wide, expandSidebar, useWorkspaces, useSessions, useSessionStatus, usePanelInfo, t,
         openSession, startSession, renameWorkspace, deleteWorkspace, createWorkspace, pickDirectory, archiveSession, badges, virtualGroups,
       } = props
       const workspaces = useWorkspaces((state) => state.items)
       const archived = useWorkspaces((state) => state.archivedSessionIds)
       const sessions = useSessions((state) => state)
       const statuses = useSessionStatus((state) => state)
+      const panelActive = usePanelInfo((info) => info.activePanelId !== null)
+      const currentId = panelActive
+        ? undefined
+        : (Object.values(sessions.byId) as any[]).find((session) => (session.retainedBy?.mainView ?? 0) > 0)?.id
+      const currentWorkspaceId = currentId === undefined
+        ? undefined
+        : workspaces.find((workspace) => Array.isArray(workspace.sessionIds) && workspace.sessionIds.includes(currentId))?.workspaceId
       const [query, setQuery] = React.useState('')
       const [collapsed, setCollapsed] = React.useState({})
       const [badgeConfig, setBadgeConfig] = React.useState(badges)
       const [groups, setGroups] = React.useState([])
+      const [dragPath, setDragPath] = React.useState(null)
+      const [dropGroup, setDropGroup] = React.useState(null)
       const [menuFor, setMenuFor] = React.useState(null)
       const [iconFor, setIconFor] = React.useState(null)
       const [renaming, setRenaming] = React.useState(null)
       const [renameDraft, setRenameDraft] = React.useState('')
+
+      // Reveal the focused session even when its workspace was collapsed.
+      React.useEffect(() => {
+        if (currentWorkspaceId === undefined) return
+        setCollapsed((previous) => previous[currentWorkspaceId] === true
+          ? { ...previous, [currentWorkspaceId]: false }
+          : previous)
+      }, [currentWorkspaceId])
 
       React.useEffect(() => {
         void fetch('/dsh-enhance/groups')
@@ -1250,6 +1531,23 @@ let shortcutsService: any = null
         }).catch(() => {})
       }
 
+      const moveToGroup = (path, groupId) => {
+        const next = groups.map((group) => ({
+          ...group,
+          workspaces: (group.workspaces ?? []).filter((entry) => entry !== path),
+        }))
+        const target = next.find((group) => group.id === groupId)
+        if (target === undefined) return
+        target.workspaces.push(path)
+        if (JSON.stringify(next) === JSON.stringify(groups)) return
+        setGroups(next)
+        void fetch('/dsh-enhance/groups', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ groups: next }),
+        }).catch(() => {})
+      }
+
       const removeSession = (id) => {
         void archiveSession(id).catch(() => {
           if (window.confirm(t('browser.deleteRunning'))) void archiveSession(id, true).catch(() => {})
@@ -1278,13 +1576,35 @@ let shortcutsService: any = null
         const menuOpen = menuFor === workspace.workspaceId
         const iconOpen = iconFor === workspace.workspaceId
         const isCollapsed = collapsed[workspace.workspaceId] === true
+        const isCurrentWorkspace = workspace.workspaceId === currentWorkspaceId
         const kinds = sessionIds.map((id) => statusKind(statuses.get(id)))
         const workspaceStatus = kinds.includes('waiting') ? 'waiting'
           : kinds.includes('running') ? 'running'
             : kinds.includes('done') ? 'done'
               : 'idle'
-        return h('div', { key: workspace.workspaceId, style: workspaceBlockStyle },
-          h('div', { className: 'dsh-enhance-row', style: { ...workspaceRowStyle, paddingLeft: (indent ? 16 : 0) + 4 + 'px', position: 'relative' } },
+        return h('div', {
+          key: workspace.workspaceId,
+          style: workspaceBlockStyle,
+          draggable: true,
+          onDragStart: (event) => {
+            event.dataTransfer.setData('text/plain', workspace.path)
+            event.dataTransfer.effectAllowed = 'move'
+            setDragPath(workspace.path)
+          },
+          onDragEnd: () => {
+            setDragPath(null)
+            setDropGroup(null)
+          },
+        },
+          h('div', {
+            className: 'dsh-enhance-row',
+            style: {
+              ...workspaceRowStyle,
+              paddingLeft: (indent ? 16 : 0) + 4 + 'px',
+              position: 'relative',
+              ...(isCurrentWorkspace ? { boxShadow: 'inset 2px 0 0 var(--dsw-alias-state-business-primary)' } : {}),
+            },
+          },
             h('button', {
               type: 'button',
               style: {
@@ -1353,6 +1673,18 @@ let shortcutsService: any = null
                       setIconFor(workspace.workspaceId)
                     },
                   }, t('browser.changeIcon')),
+                  ...activeGroups
+                    .filter((group) => !(group.workspaces ?? []).includes(workspace.path))
+                    .map((group) => h('button', {
+                      key: 'move:' + group.id,
+                      type: 'button',
+                      role: 'menuitem',
+                      style: menuItemStyle,
+                      onClick: () => {
+                        setMenuFor(null)
+                        moveToGroup(workspace.path, group.id)
+                      },
+                    }, t('browser.moveTo', { group: group.title }))),
                   h('button', {
                     type: 'button',
                     role: 'menuitem',
@@ -1410,11 +1742,22 @@ let shortcutsService: any = null
             : null,
           isCollapsed ? null : visibleSessions.map((id) => {
                 const status = statuses.get(id)
+                const isCurrent = id === currentId
                 return h('button', {
                   key: id,
                   type: 'button',
                   className: 'dsh-enhance-row',
-                  style: { ...sessionRowStyle, paddingLeft: (indent ? 10 : 0) + 12 + 'px' },
+                  'aria-current': isCurrent ? 'page' : undefined,
+                  style: {
+                    ...sessionRowStyle,
+                    paddingLeft: (indent ? 10 : 0) + 12 + 'px',
+                    ...(isCurrent
+                      ? {
+                          background: 'var(--dsw-alias-bg-layer-3)',
+                          boxShadow: 'inset 2px 0 0 var(--dsw-alias-state-business-primary)',
+                        }
+                      : {}),
+                  },
                   onClick: () => openSession(id),
                 },
                 h('span', { style: { width: '12px', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, h(StatusDot, { kind: statusKind(status) })),
@@ -1448,7 +1791,30 @@ let shortcutsService: any = null
       for (const group of activeGroups) {
         const members = (group.workspaces ?? []).map((path) => byPath.get(path)).filter((workspace) => workspace !== undefined)
         if (members.length === 0) continue
-        rows.push(h('div', { key: 'group:' + group.id, className: 'dsh-enhance-group', style: groupStyle },
+        rows.push(h('div', {
+          key: 'group:' + group.id,
+          className: 'dsh-enhance-group',
+          style: dropGroup === group.id
+            ? { ...groupStyle, outline: '1px dashed var(--dsw-alias-state-success-primary)', outlineOffset: '-2px' }
+            : groupStyle,
+          onDragOver: (event) => {
+            if (dragPath === null) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'move'
+            if (dropGroup !== group.id) setDropGroup(group.id)
+          },
+          onDragLeave: (event) => {
+            if (event.currentTarget.contains(event.relatedTarget)) return
+            setDropGroup(null)
+          },
+          onDrop: (event) => {
+            event.preventDefault()
+            const path = event.dataTransfer.getData('text/plain') || dragPath
+            setDragPath(null)
+            setDropGroup(null)
+            if (path !== null && path !== '') moveToGroup(path, group.id)
+          },
+        },
           h('div', { className: 'dsh-enhance-row', style: { ...workspaceRowStyle, paddingLeft: '8px', position: 'relative' } },
             h('span', { style: workspaceTitleStyle }, group.title),
             h('span', { style: { flex: 'none', fontSize: '10px', color: 'var(--dsw-alias-label-secondary)' } }, String(members.length)),
@@ -1873,7 +2239,7 @@ let shortcutsService: any = null
       )
     }
 
-    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sidebarRight', 'sidebarRightTabs', 'shortcuts']
+    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sidebarRight', 'sidebarRightTabs', 'shortcuts', 'layout', 'remote', 'remote.session']
 
     function DecoratorStyle() {
       const [decorators, setDecorators] = React.useState({ tools: {}, variants: {} })
@@ -1921,6 +2287,7 @@ let shortcutsService: any = null
       const rows = [
         ['customLeftbar', t('settings.customLeftbar'), t('settings.customLeftbarHint')],
         ['globalBar', t('settings.globalBar'), t('settings.globalBarHint')],
+        ['statusbar', t('settings.statusbar'), t('settings.statusbarHint')],
         ['virtualGroups', t('settings.virtualGroups'), t('settings.virtualGroupsHint')],
         ['splitPanes', t('settings.splitPanes'), t('settings.splitPanesHint')],
       ]
@@ -1986,8 +2353,45 @@ let shortcutsService: any = null
       )
     }
 
+    const backCss = `
+      .dsh-enhance-back { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-right: 4px; border: none; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 16px; line-height: 1; }
+      .dsh-enhance-back:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+      .dsh-enhance-back:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 1px; }
+    `
+
+    // The host clears the selected panel when a Session opens, so remember the
+    // last panel to offer a way back to it (e.g. the Linear board). The header
+    // unmounts while a panel is shown, so the memory lives outside the component.
+    let lastPanelId: any = null
+
+    function BackToPanel({ usePanelInfo, t }) {
+      const panel = usePanelInfo((state) => state.activePanelId)
+      const [failed, setFailed] = React.useState(false)
+      React.useEffect(() => {
+        if (panel !== null) setFailed(false)
+      }, [panel])
+      if (panel !== null || lastPanelId === null || failed) return null
+      return h(React.Fragment, null,
+        h('style', null, backCss),
+        h('button', {
+          type: 'button',
+          className: 'dsh-enhance-back',
+          title: t('header.back'),
+          'aria-label': t('header.back'),
+          onClick: () => {
+            try {
+              layoutService.selectPanel(lastPanelId)
+            } catch {
+              lastPanelId = null
+              setFailed(true)
+            }
+          },
+        }, '\u2190'))
+    }
+
     function apply(ctx) {
       sidebarRight = ctx.sidebarRight
+      layoutService = ctx.layout
       workspacesService = ctx.workspaces
       shortcutsService = ctx.shortcuts
       ctx.effect(() => ctx.locale.register(NS, { en, zh }), 'dsh-enhance: dictionaries')
@@ -2000,6 +2404,23 @@ let shortcutsService: any = null
         document.head.appendChild(style)
         return () => style.remove()
       }, 'dsh-enhance: rightbar focus ring')
+
+      ctx.effect(() => {
+        const remember = () => {
+          const id = ctx.layout.panelInfo.getSnapshot().activePanelId
+          if (id !== null) lastPanelId = id
+        }
+        remember()
+        return ctx.layout.panelInfo.subscribe(remember)
+      }, 'dsh-enhance: remember last panel')
+
+      ctx.effect(
+        () => ctx.slots.inject('conversation.header.leading', () => ctx.slots.register({
+          name: 'conversation.header.leading',
+          locale: NS,
+        }, BackToPanel)),
+        'dsh-enhance: session back button',
+      )
 
       ctx.effect(
         () => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
@@ -2039,6 +2460,17 @@ let shortcutsService: any = null
           locale: NS,
         }, EditorBody)),
         'dsh-enhance: editor tab body',
+      )
+
+      ctx.effect(
+        () => ctx.slots.inject('conversation.view', () => ctx.slots.register({
+          name: 'conversation.view',
+          id: 'dsh-enhance.flow',
+          order: 20,
+          locale: NS,
+          label: () => t('flow.title'),
+        }, FlowView)),
+        'dsh-enhance: flow view',
       )
 
       const inGlobal = (target) => target !== undefined && target !== null
@@ -2100,7 +2532,12 @@ let shortcutsService: any = null
           name: 'shell.bottom',
           id: 'dsh-enhance.global-bar',
           locale: NS,
-        }, GlobalBar)),
+          inject: () => ({
+            openPath: (path) => {
+              void ctx.remote.session.openWorkspacePath({ path, action: 'reveal' }).catch(() => {})
+            },
+          }),
+        }, BottomBar)),
         'dsh-enhance: global bar',
       )
 
@@ -2194,6 +2631,15 @@ let shortcutsService: any = null
           const settings = config !== null && typeof config === 'object' ? config : {}
           featureConfig.splitPanes = settings.splitPanes !== false
           featureConfig.globalBar = settings.globalBar !== false
+          const segments = settings.statusbarSegments !== null && typeof settings.statusbarSegments === 'object'
+            ? settings.statusbarSegments
+            : {}
+          statusbarStore.set({
+            enabled: settings.statusbar !== false,
+            left: Array.isArray(segments.left) ? segments.left : ['session'],
+            center: Array.isArray(segments.center) ? segments.center : ['cwd'],
+            right: Array.isArray(segments.right) ? segments.right : ['status', 'time'],
+          })
           if (settings.customLeftbar !== false) registerBrowser(settings)
         })
         .catch(() => {

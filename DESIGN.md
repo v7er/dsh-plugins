@@ -52,7 +52,7 @@ Astryx names the role; the right column is the only legal implementation in a pl
 | Emphasized border (`--color-border-emphasized`) | `--dsw-alias-border-l3` |
 | Hover fill (`--color-overlay-hover`) | `--dsw-alias-interactive-bg-hover` |
 | Pressed fill (`--color-overlay-pressed`) | `--dsw-alias-interactive-bg-active` |
-| Accent / primary action (`--color-accent`) | `--dsw-alias-brand-primary` |
+| Accent / primary action (`--color-accent`) | `--dsw-alias-state-success-primary` |
 | Focus ring | `--dsw-alias-state-business-primary` |
 
 ### Status
@@ -67,6 +67,14 @@ Astryx names the role; the right column is the only legal implementation in a pl
 | Idle | `--dsw-alias-state-idle-primary` |
 
 Status color is never the only signal: pair it with an icon or a word.
+
+### Accent
+
+The workspace accent is the notification green, `--dsw-alias-state-success-primary`.
+Use it for the primary action, the active tab underline, the selected row edge, the avatar
+fill, and checked controls. It is the same green the notification badge uses, so every
+plugin reads as part of one window. Focus rings stay
+`--dsw-alias-state-business-primary`; do not tint them green.
 
 ### Shape
 
@@ -139,6 +147,8 @@ Host scale. Use these sizes and line heights; do not invent intermediate values.
 - Sidebars and panels fill their slot: `height: 100%`, `min-height: 0`, one scroll region.
   Never nest two vertical scrollers.
 - Empty state: one sentence of what is missing, one action. No illustration required.
+- Long issue or description text clamps to 8 lines with a Show more toggle. One field never
+  pushes the rest of the panel away.
 - Loading: skeleton rows or a spinner, never a blank panel. Keep the previous content
   visible while refreshing.
 
@@ -149,10 +159,12 @@ Match these behaviors.
 
 ### Button
 
-- Variants: primary (filled `--dsw-alias-brand-primary`, text
-  `--dsw-alias-label-primary-inverted`), secondary (transparent, `--dsw-alias-border-l1`
-  border), ghost (transparent, hover fill), danger (text/border
-  `--dsw-alias-state-error-primary`).
+- Variants: primary (filled `--dsw-alias-state-success-primary`, text
+  `--dsw-alias-label-primary-inverted`), secondary (white surface
+  `--dsw-alias-bg-layer-1`, `--dsw-alias-border-l1` border), ghost (transparent, hover
+  fill), danger (white surface, text/border `--dsw-alias-state-error-primary`).
+- Red is reserved for destructive, hard-to-undo actions: remove, clear, cancel in an
+  external system. Archive, reject, send back, and other reversible steps are secondary.
 - States: hover, active, focus-visible, disabled, loading (spinner replaces the label, width
   stays fixed).
 - One primary button per view or dialog footer.

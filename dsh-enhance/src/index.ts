@@ -219,11 +219,17 @@ export function apply(ctx: any, config: any = {}) {
         meta TEXT,
         time INTEGER,
         seq INTEGER,
+        tool TEXT,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (session_id, turn, id)
       );
       CREATE INDEX IF NOT EXISTS flow_events_turn ON flow_events(session_id, turn);
     `)
+    // Older databases predate the tool column; add it in place.
+    const columns = flowDb.prepare('PRAGMA table_info(flow_events)').all() as Array<{ name?: string }>
+    if (!columns.some((column) => column.name === 'tool')) {
+      flowDb.exec('ALTER TABLE flow_events ADD COLUMN tool TEXT')
+    }
     return flowDb
   }
   const readRaw = () => {
@@ -782,7 +788,7 @@ export function apply(ctx: any, config: any = {}) {
             sendJson(res, 400, { error: 'turn required' })
             return
           }
-          const rows = db.prepare('SELECT id, turn, step, phase, title, detail, status, meta, time, seq FROM flow_events WHERE session_id = ? AND turn = ? ORDER BY step ASC, seq ASC, id ASC').all(sessionId, turn)
+          const rows = db.prepare('SELECT id, turn, step, phase, title, detail, status, meta, time, seq, tool FROM flow_events WHERE session_id = ? AND turn = ? ORDER BY step ASC, seq ASC, id ASC').all(sessionId, turn)
           sendJson(res, 200, { events: rows })
           return
         }
@@ -796,8 +802,8 @@ export function apply(ctx: any, config: any = {}) {
             return
           }
           const statement = db.prepare(`
-            INSERT INTO flow_events (session_id, turn, step, id, phase, title, detail, status, meta, time, seq, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO flow_events (session_id, turn, step, id, phase, title, detail, status, meta, time, seq, tool, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id, turn, id) DO UPDATE SET
               step = excluded.step,
               phase = excluded.phase,
@@ -807,6 +813,7 @@ export function apply(ctx: any, config: any = {}) {
               meta = excluded.meta,
               time = excluded.time,
               seq = excluded.seq,
+              tool = excluded.tool,
               updated_at = excluded.updated_at
           `)
           const now = Date.now()
@@ -827,6 +834,7 @@ export function apply(ctx: any, config: any = {}) {
                 typeof event.meta === 'string' ? event.meta : null,
                 Number.isFinite(event.time) ? event.time : null,
                 Number.isFinite(event.seq) ? event.seq : null,
+                typeof event.tool === 'string' ? event.tool : null,
                 now,
               )
             }

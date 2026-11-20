@@ -19,6 +19,7 @@ import { MOCK_FLOW_SNAPSHOT, MOCK_FLOW_TODOS } from './flow-mock'
 const h: any = React.createElement
 
 type FlowTranslate = (key: string, params?: Record<string, string | number>) => string
+type FlowRenderSlot = (key: string, owner: object, opts?: { only?: string }) => React.ReactNode
 
 interface FlowViewProps {
   t: FlowTranslate
@@ -26,6 +27,7 @@ interface FlowViewProps {
   useProjection: (key: string, selector: (value: unknown) => unknown) => unknown
   useSessions: (selector: (value: unknown) => unknown) => unknown
   sessionId: string
+  renderSlot?: FlowRenderSlot
 }
 
 interface FlowSessionsState {
@@ -74,6 +76,7 @@ function FlowIcon({ name, size = 16, className }: { name: string; size?: number;
 }
 
 const FlowLocale = React.createContext<FlowTranslate>((key) => key)
+const FlowRenderSlotContext = React.createContext<FlowRenderSlot | undefined>(undefined)
 
 function statusLabel(status: FlowStatus, t: FlowTranslate): string {
   if (status === 'running') return t('flow.running')
@@ -116,7 +119,7 @@ function TurnCard({ id, data, t }: { id: string; data: FlowCardData; t: FlowTran
       }
     },
   },
-  h(Handle, { type: 'source', position: Position.Right, className: 'dsh-flow-handle' }),
+  h(Handle, { type: 'source', position: Position.Bottom, className: 'dsh-flow-handle' }),
   h('div', { className: 'dsh-flow-turn-head' },
     h('span', { className: 'dsh-flow-turn-icon' }, h(FlowIcon, { name: data.icon, size: 18 })),
     h('span', { className: 'dsh-flow-turn-title' }, data.title),
@@ -137,7 +140,7 @@ function TaskCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
     if (data.detailId !== undefined) data.onSelect?.(data.detailId)
   }
   return h('div', { className: `dsh-flow-group-card is-${data.status}` },
-    h(Handle, { type: 'target', position: Position.Left, className: 'dsh-flow-handle' }),
+    h(Handle, { type: 'target', position: Position.Top, className: 'dsh-flow-handle' }),
     h('div', {
       className: 'dsh-flow-group-head nodrag nopan',
       role: 'button',
@@ -177,11 +180,14 @@ function TaskCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
         'aria-label': `${check.title} · ${statusLabel(check.status, t)}`,
       },
       h('span', { className: 'dsh-flow-row-icon' }, h(FlowIcon, { name: check.icon })),
-      h('span', { className: 'dsh-flow-row-title' }, check.title),
+      h('span', {
+        className: `dsh-flow-row-title${check.tool !== undefined && /bash|shell|exec|run|command|terminal|pwsh/u.test(check.tool) ? ' is-code' : ''}`,
+      }, check.title),
       check.meta === undefined || check.meta === '' ? null : h('span', { className: 'dsh-flow-row-meta' }, check.meta),
       h('span', { className: `dsh-flow-row-status is-${check.status}` }, statusIcon(check.status, t)),
       )),
     ),
+    h(Handle, { type: 'source', position: Position.Bottom, className: 'dsh-flow-handle' }),
   )
 }
 
@@ -194,7 +200,7 @@ function PlanningCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
     if (data.detailId !== undefined) data.onSelect?.(data.detailId)
   }
   return h('div', { className: `dsh-flow-group-card is-${data.status}` },
-    h(Handle, { type: 'target', position: Position.Left, className: 'dsh-flow-handle' }),
+    h(Handle, { type: 'target', position: Position.Top, className: 'dsh-flow-handle' }),
     h('div', {
       className: 'dsh-flow-group-head nodrag nopan',
       role: 'button',
@@ -236,7 +242,7 @@ function PlanningCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
         h('span', { className: `dsh-flow-row-status is-${item.status}` }, statusIcon(item.status, t)),
       )),
     ),
-    h(Handle, { type: 'source', position: Position.Right, className: 'dsh-flow-handle' }),
+    h(Handle, { type: 'source', position: Position.Bottom, className: 'dsh-flow-handle' }),
   )
 }
 
@@ -258,7 +264,7 @@ function VerifyCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
       }
     },
   },
-  h(Handle, { type: 'target', position: Position.Left, className: 'dsh-flow-handle' }),
+  h(Handle, { type: 'target', position: Position.Top, className: 'dsh-flow-handle' }),
   h('div', { className: 'dsh-flow-turn-head' },
     h('span', { className: 'dsh-flow-turn-icon' }, h(FlowIcon, { name: data.icon, size: 18 })),
     h('span', { className: 'dsh-flow-turn-title' }, data.title),
@@ -266,7 +272,43 @@ function VerifyCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
     statusIcon(data.status, t),
   ),
   h('div', { className: 'dsh-flow-turn-prompt' }, data.detail ?? ''),
-  h(Handle, { type: 'source', position: Position.Right, className: 'dsh-flow-handle' }),
+  h(Handle, { type: 'source', position: Position.Bottom, className: 'dsh-flow-handle' }),
+  )
+}
+
+function ResponseCard({ data, t }: { data: FlowCardData; t: FlowTranslate }) {
+  const renderSlot = React.useContext(FlowRenderSlotContext)
+  const open = (): void => {
+    if (data.detailId !== undefined) data.onSelect?.(data.detailId)
+  }
+  return h('div', {
+    className: `dsh-flow-response-card is-${data.status}`,
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': `${data.title}: ${t('flow.summary')}`,
+    onClick: open,
+    onPointerDown: (event: React.PointerEvent) => { event.stopPropagation() },
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        open()
+      }
+    },
+  },
+  h(Handle, { type: 'target', position: Position.Top, className: 'dsh-flow-handle' }),
+  h('div', { className: 'dsh-flow-turn-head' },
+    h('span', { className: 'dsh-flow-turn-icon' }, h(FlowIcon, { name: data.icon, size: 18 })),
+    h('span', { className: 'dsh-flow-turn-title' }, data.title),
+    h('span', { className: 'dsh-flow-turn-phase' }, t('flow.done')),
+    statusIcon(data.status, t),
+  ),
+  h('div', { className: 'dsh-flow-response-text' }, data.detail ?? ''),
+  h('div', {
+    className: 'dsh-flow-response-badge nodrag nopan is-static',
+    inert: true,
+  }, renderSlot === undefined || data.turn === undefined
+    ? null
+    : renderSlot('conversation.chat.turnTail', { turn: { turn: data.turn }, seq: 0, openFile: () => {} }, { only: '@local/turn-stats' })),
   )
 }
 
@@ -275,6 +317,7 @@ function FlowCard({ id, data }: { id: string; data: FlowCardData }) {
   if (data.kind === 'turn') return h(TurnCard, { id, data, t })
   if (data.kind === 'verify') return h(VerifyCard, { data, t })
   if (data.kind === 'planning') return h(PlanningCard, { data, t })
+  if (data.kind === 'response') return h(ResponseCard, { data, t })
   return h(TaskCard, { data, t })
 }
 
@@ -363,6 +406,16 @@ function FlowCanvas({ graph, t, selectedId, onSelect, detailOpen }: {
 }
 
 function FlowDetailPanel({ t, detail, onClose }: { t: FlowTranslate; detail: FlowDetail; onClose: () => void }) {
+  const renderSlot = React.useContext(FlowRenderSlotContext)
+  const badgeRef = React.useRef<HTMLDivElement | null>(null)
+  const isResponse = detail.id === 'response-detail' && detail.turn !== undefined
+  React.useEffect(() => {
+    if (!isResponse) return undefined
+    const frame = requestAnimationFrame(() => {
+      badgeRef.current?.querySelector<HTMLElement>('[data-turn-stats]')?.click()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isResponse, detail.id])
   return h('aside', { className: 'dsh-flow-detail', role: 'region', 'aria-label': t('flow.detail') },
     h('div', { className: 'dsh-flow-detail-head' },
       h('div', { className: 'dsh-flow-detail-heading' },
@@ -378,6 +431,10 @@ function FlowDetailPanel({ t, detail, onClose }: { t: FlowTranslate; detail: Flo
       }, h(FlowIcon, { name: 'close' })),
     ),
     detail.meta === undefined || detail.meta === '' ? null : h('div', { className: 'dsh-flow-detail-meta' }, detail.meta),
+    isResponse
+      ? h('div', { className: 'dsh-flow-detail-badge', ref: badgeRef },
+          renderSlot === undefined ? null : renderSlot('conversation.chat.turnTail', { turn: { turn: detail.turn }, seq: 0, openFile: () => {} }, { only: '@local/turn-stats' }))
+      : null,
     h('pre', { className: 'dsh-flow-detail-body' }, detail.body),
   )
 }
@@ -492,6 +549,7 @@ function FlowViewInner(props: FlowViewProps) {
             meta: typeof event.meta === 'string' ? event.meta : undefined,
             time: typeof event.time === 'number' ? event.time : undefined,
             seq: typeof event.seq === 'number' ? event.seq : undefined,
+            tool: typeof event.tool === 'string' ? event.tool : undefined,
           })))
         }
       })
@@ -587,7 +645,8 @@ function FlowViewInner(props: FlowViewProps) {
     window.history.replaceState(null, '', url)
   }, [mock])
   return h(FlowLocale.Provider, { value: t },
-    h(FlowShell, { t, graph, running, selectedId, selectedTurn, onSelect, onClose, onTurnChange, mock, onToggleMock }))
+    h(FlowRenderSlotContext.Provider, { value: props.renderSlot },
+      h(FlowShell, { t, graph, running, selectedId, selectedTurn, onSelect, onClose, onTurnChange, mock, onToggleMock })))
 }
 
 /**
@@ -609,7 +668,9 @@ export function FlowView(props: FlowViewProps) {
       onToggleMock: () => {},
     })
   }
-  return h(FlowViewInner, props)
+  // Key by session so navigating between sessions remounts the view: turn
+  // selection, stored events, and the pending write queue are per-session.
+  return h(FlowViewInner, { ...props, key: props.sessionId })
 }
 
 const FLOW_CSS = `
@@ -648,15 +709,21 @@ const FLOW_CSS = `
 .dsh-flow-turn-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-state-business-primary); }
 .dsh-flow-turn-title { font-size: 13px; line-height: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dsh-flow-turn-phase { flex: none; padding: 0 6px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 9999px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
-.dsh-flow-turn-prompt { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.dsh-flow-turn-prompt { flex: 1; min-height: 0; overflow: auto; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
 .dsh-flow-turn-meta { margin-top: auto; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-flow-response-card { box-sizing: border-box; width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); cursor: pointer; animation: dsh-flow-in 220ms cubic-bezier(.4, 0, .2, 1); }
+.dsh-flow-response-card.is-done { border-color: var(--dsw-alias-state-success-primary); }
+.dsh-flow-response-text { flex: 1; min-height: 0; overflow: auto; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
+.dsh-flow-response-badge { flex: none; min-width: 0; overflow: hidden; }
+.dsh-flow-response-badge.is-static { pointer-events: none; }
+.dsh-flow-detail-badge { flex: none; min-width: 0; overflow: hidden; }
 .dsh-flow-group-card { box-sizing: border-box; width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); animation: dsh-flow-in 220ms cubic-bezier(.4, 0, .2, 1); }
 .dsh-flow-group-card.is-running { border-color: var(--dsw-alias-state-business-primary); box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary); }
 .dsh-flow-group-card.is-error { border-color: var(--dsw-alias-state-error-primary); }
 .dsh-flow-group-head { display: flex; flex-direction: column; gap: 8px; min-width: 0; cursor: pointer; border-radius: var(--dsw-radius-sm); }
 .dsh-flow-group-head:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 .dsh-flow-group-head-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.dsh-flow-group-prompt { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.dsh-flow-group-prompt { max-height: 54px; overflow: auto; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
 .dsh-flow-group-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border-radius: var(--dsw-radius-xs); background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-secondary); }
 .dsh-flow-group-title { font-size: 13px; line-height: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dsh-flow-group-phase { flex: none; padding: 0 6px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 9999px; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
@@ -668,7 +735,7 @@ const FLOW_CSS = `
 .dsh-flow-group-progress-fill.is-done { background: var(--dsw-alias-state-success-primary); }
 .dsh-flow-group-progress-fill.is-error { background: var(--dsw-alias-state-error-primary); }
 .dsh-flow-group-progress-fill.is-idle { background: var(--dsw-alias-border-l3); }
-.dsh-flow-group-rows { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+.dsh-flow-group-rows { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto; }
 .dsh-flow-row { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 4px 8px; border: none; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-primary); text-align: left; cursor: pointer; font-size: 12px; line-height: 18px; }
 .dsh-flow-row.depth-1 { padding-left: 20px; }
 .dsh-flow-row.depth-2 { padding-left: 36px; }
@@ -685,6 +752,7 @@ const FLOW_CSS = `
 .dsh-flow-row-status.is-error { color: var(--dsw-alias-state-error-primary); }
 .dsh-flow-row-status.is-idle { color: var(--dsw-alias-label-tertiary); }
 .dsh-flow-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-flow-row-title.is-code { font-family: var(--ds-font-family-code); }
 .dsh-flow-row-meta { flex: none; font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
 .dsh-flow-status { display: inline-flex; flex: none; margin-left: auto; }
 .dsh-flow-status.is-running { color: var(--dsw-alias-state-business-primary); }

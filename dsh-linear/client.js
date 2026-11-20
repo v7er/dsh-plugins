@@ -194,6 +194,11 @@ window.__ModuleLoader__.load({
       'board.turnNotePlaceholder': 'e.g. run migrations, bump version',
       'board.saveNote': 'Save note',
       'board.noteSaved': 'Turn note saved.',
+      'board.pauseTurn': 'Pause turn',
+      'board.resumeTurn': 'Resume turn',
+      'board.turnPaused': 'Turn paused. The next queued task waits until you resume.',
+      'board.pausedNotice': 'Turn paused.',
+      'board.resumedNotice': 'Turn resumed.',
       'board.backToReview': 'Back to review',
       'board.movedToReview': 'Moved back to review.',
       'board.turnReview': 'Turn {number} ready on {branch}',
@@ -501,6 +506,11 @@ window.__ModuleLoader__.load({
       'board.turnNotePlaceholder': '例如：运行迁移、升级版本',
       'board.saveNote': '保存备注',
       'board.noteSaved': '回合备注已保存。',
+      'board.pauseTurn': '暂停回合',
+      'board.resumeTurn': '继续回合',
+      'board.turnPaused': '回合已暂停。下一个排队任务会等到你继续。',
+      'board.pausedNotice': '回合已暂停。',
+      'board.resumedNotice': '回合已继续。',
       'board.backToReview': '退回审查',
       'board.movedToReview': '已退回审查。',
       'board.turnReview': '回合 {number} 已就绪：{branch}',
@@ -1269,7 +1279,7 @@ window.__ModuleLoader__.load({
         }, t('board.openSession')) : null))
     }
 
-    function QueueRow({ task, t, sessionStatus, onSelect, onStart, onMarkDone, onAssign, onOpenSession, onBackToReview, workspaces, canStart, showCycle = true }) {
+    function QueueRow({ task, t, sessionStatus, onSelect, onStart, onMarkDone, onAssign, onOpenSession, onBackToReview, onArchive, workspaces, canStart, showCycle = true }) {
       const options = workspaces.filter(workspace => workspace.projectId === task.project_id)
       const [choice, setChoice] = React.useState('')
       const running = sessionStatus === undefined ? task.session_id !== null : sessionStatus.running !== false
@@ -1333,12 +1343,19 @@ window.__ModuleLoader__.load({
               onClick: (event) => { event.stopPropagation(); onStart() },
             }, t('board.start'))
             : null,
-          task.status === 'todo' && task.turn_id === ''
+          (task.status === 'todo' && task.turn_id === '') || task.status === 'blocked'
             ? h('button', {
               type: 'button',
               className: 'dshl-btn',
               onClick: (event) => { event.stopPropagation(); onBackToReview() },
             }, t('board.backToReview'))
+            : null,
+          task.status === 'blocked'
+            ? h('button', {
+              type: 'button',
+              className: 'dshl-btn',
+              onClick: (event) => { event.stopPropagation(); onArchive() },
+            }, t('board.archive'))
             : null,
           finished && !needsApproval
             ? h('button', {
@@ -1512,7 +1529,7 @@ window.__ModuleLoader__.load({
     function ReviewDetail({
       task, cycle, cycles, milestones, diff, t, busy, rejecting, rejectReason, sessionStatus, showCycle = true,
       onRejectReason, onStartReject, onCancelReject, onReject, onApprove,
-      onMarkReviewed, onOpenSession, onClose, onArchive, onCancelInLinear, onUpdateFields,
+      onMarkReviewed, onOpenSession, onClose, onArchive, onBackToReview, onCancelInLinear, onUpdateFields,
     }) {
       const comments = Array.isArray(task.comments) ? task.comments : []
       const pending = task.status === 'pending_approval'
@@ -1649,6 +1666,12 @@ window.__ModuleLoader__.load({
                   ? h('button', { type: 'button', className: 'dshl-btn', disabled: busy, onClick: onStartReject }, t('board.reject'))
                   : null,
                 task.status === 'in_review'
+                  ? h('button', { type: 'button', className: 'dshl-btn', disabled: busy, onClick: onArchive }, t('board.archive'))
+                  : null,
+                task.status === 'blocked'
+                  ? h('button', { type: 'button', className: 'dshl-btn', disabled: busy, onClick: onBackToReview }, t('board.backToReview'))
+                  : null,
+                task.status === 'blocked'
                   ? h('button', { type: 'button', className: 'dshl-btn', disabled: busy, onClick: onArchive }, t('board.archive'))
                   : null,
                 h('button', {
@@ -2590,7 +2613,8 @@ window.__ModuleLoader__.load({
       const workingCycle = selectedCycle ?? activeCycle
       const cycleTurns = workingCycle === null ? boardTurns : boardTurns.filter(turn => turn.cycleId === workingCycle.id)
       const latestTurn = cycleTurns[0] ?? null
-      const turnActive = latestTurn !== null && (latestTurn.state === 'working' || latestTurn.state === 'blocked')
+      const turnActive = latestTurn !== null && (latestTurn.state === 'working' || latestTurn.state === 'blocked' || latestTurn.state === 'paused')
+      const turnPaused = latestTurn !== null && latestTurn.state === 'paused'
       const { current: currentCycle, next: nextCycle } = cycleWindow(boardCycles)
       const headCycle = selectedCycle ?? activeCycle
       const filteredAll = cycleId === 'all' ? boardTasks : boardTasks.filter(task => task.cycle_id === cycleId)
@@ -2604,6 +2628,8 @@ window.__ModuleLoader__.load({
       const workingTasks = workingCycle === null ? filtered : filtered.filter(task => task.cycle_id === workingCycle.id)
       const todoTasks = workingTasks.filter(task => task.status === 'todo')
       const turnPending = workingTasks.some(task => task.status === 'doing' || task.status === 'in_review' || task.status === 'blocked')
+      // A blocked turn with queued tasks resumes from Start working once the blocker is cleared.
+      const canResumeBlocked = latestTurn !== null && latestTurn.state === 'blocked' && todoTasks.length > 0 && !turnPending
       const doneTasks = filtered.filter(task => task.status === 'done')
       const selected = selectedId === null ? null : (boardTasks.find(task => task.id === selectedId) ?? null)
       const transcriptTask = sessionView === null ? null : (boardTasks.find(task => task.id === sessionView) ?? null)
@@ -2881,6 +2907,18 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const pauseTurn = async () => {
+        if (latestTurn === null) return
+        const payload = await act({ op: 'pauseTurn', turnId: latestTurn.id })
+        if (payload?.ok === true) setNotice(t('board.pausedNotice'))
+      }
+
+      const resumeTurn = async () => {
+        if (latestTurn === null) return
+        const payload = await act({ op: 'resumeTurn', turnId: latestTurn.id })
+        if (payload?.ok === true) setNotice(t('board.resumedNotice'))
+      }
+
       const backToReview = async (id) => {
         const payload = await act({ op: 'unapprove', id })
         if (payload?.ok === true) setNotice(t('board.movedToReview'))
@@ -3087,6 +3125,7 @@ window.__ModuleLoader__.load({
                             ? h('p', { className: 'dshl-note' }, `${t('board.previousNote')}: ${latestTurn.note}`)
                             : null,
                           h('p', { className: 'dshl-hint' }, turnActive ? t('board.turnNoteHint') : t('board.startWorkingHint')),
+                          turnPaused ? h('p', { className: 'dshl-note' }, t('board.turnPaused')) : null,
                           h('textarea', {
                             className: 'dshl-textarea',
                             value: turnNote,
@@ -3100,10 +3139,22 @@ window.__ModuleLoader__.load({
                               disabled: busy,
                               onClick: () => { void saveTurnNote() },
                             }, t('board.saveNote')) : null,
+                            latestTurn?.state === 'working' ? h('button', {
+                              type: 'button',
+                              className: 'dshl-btn',
+                              disabled: busy,
+                              onClick: () => { void pauseTurn() },
+                            }, t('board.pauseTurn')) : null,
+                            turnPaused ? h('button', {
+                              type: 'button',
+                              className: 'dshl-btn primary',
+                              disabled: busy,
+                              onClick: () => { void resumeTurn() },
+                            }, t('board.resumeTurn')) : null,
                             h('button', {
                               type: 'button',
                               className: 'dshl-btn primary',
-                              disabled: busy || todoTasks.length === 0 || turnPending || turnActive || workingCycle === null,
+                              disabled: busy || todoTasks.length === 0 || turnPending || (turnActive && !canResumeBlocked) || workingCycle === null,
                               onClick: () => { void startWorking() },
                             }, t('board.startWorking')))),
                         turnPending ? h('p', { className: 'dshl-note' }, t('board.turnPending')) : null,
@@ -3120,6 +3171,7 @@ window.__ModuleLoader__.load({
                             onAssign: workspaceId => { void assignTask(task.id, workspaceId) },
                             onOpenSession: () => { selectTask(task.id); setSessionView(task.id) },
                             onBackToReview: () => { void backToReview(task.id) },
+                            onArchive: () => askArchive(task),
                             workspaces,
                             canStart: boardCycles.find(cycle => cycle.id === task.cycle_id)?.state === 'active',
                             showCycle: cycleId === 'all',
@@ -3181,6 +3233,7 @@ window.__ModuleLoader__.load({
                     onOpenSession: () => { setSessionView(selected.id) },
                     onClose: () => setSelectedId(null),
                     onArchive: () => askArchive(selected),
+                    onBackToReview: () => { void backToReview(selected.id) },
                     onCancelInLinear: () => setConfirm({
                       kind: 'cancelInLinear',
                       taskId: selected.id,

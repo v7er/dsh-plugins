@@ -1748,6 +1748,44 @@ Resolve any conflicts. Then fix the reason, commit with a message starting "${ta
     return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
   }
 
+  /** Stop the turn from starting its next queued task; the running task still finishes. */
+  const pauseTurn = async (turnId) => {
+    const database = await db()
+    const turn = await turnById(text(turnId))
+    if (turn === undefined) throw new Error('turn not found')
+    if (turn.state !== 'working') throw new Error('only a working turn can be paused')
+    database.prepare("UPDATE turns SET state = 'paused' WHERE id = ?").run(turn.id)
+    return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
+  }
+
+  /** Continue a paused turn: start the next queued task, or publish when none is left. */
+  const resumeTurn = async (turnId) => {
+    const database = await db()
+    const turn = await turnById(text(turnId))
+    if (turn === undefined) throw new Error('turn not found')
+    if (turn.state !== 'paused') throw new Error('only a paused turn can be resumed')
+    database.prepare("UPDATE turns SET state = 'working', last_error = '' WHERE id = ?").run(turn.id)
+    const doing = database.prepare("SELECT id FROM tasks WHERE turn_id = ? AND status = 'doing' LIMIT 1").get(turn.id)
+    if (doing !== undefined) return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
+    const next = database.prepare("SELECT * FROM tasks WHERE turn_id = ? AND status = 'todo' ORDER BY sequence ASC, priority DESC, created_at ASC LIMIT 1").get(turn.id)
+    if (next !== undefined) {
+      try {
+        await startTask(next, workspaceOf(next))
+      } catch (error) {
+        database.prepare("UPDATE turns SET state = 'blocked', last_error = ? WHERE id = ?").run(message(error), turn.id)
+        throw error
+      }
+      return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
+    }
+    const blocked = database.prepare("SELECT id FROM tasks WHERE turn_id = ? AND status = 'blocked' LIMIT 1").get(turn.id)
+    if (blocked !== undefined) {
+      database.prepare("UPDATE turns SET state = 'blocked' WHERE id = ?").run(turn.id)
+      return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
+    }
+    await finishTurn(turn)
+    return database.prepare('SELECT * FROM turns WHERE id = ?').get(turn.id)
+  }
+
   const mergeCycle = async (cycleId) => {
     const database = await db()
     const cycle = database.prepare('SELECT * FROM cycles WHERE id = ?').get(text(cycleId))
@@ -1922,10 +1960,25 @@ Resolve any conflicts. Then fix the reason, commit with a message starting "${ta
     const database = await db()
     const task = database.prepare('SELECT * FROM tasks WHERE id = ?').get(text(id))
     if (task === undefined) throw new Error('task not found')
-    if (task.status !== 'todo') throw new Error('Only a queued task can go back to review')
+    const now = new Date().toISOString()
+    // A blocked task can go back to the approval queue; its turn keeps the row.
+    if (task.status === 'blocked') {
+      database.prepare("UPDATE tasks SET status = 'pending_approval', review_state = 'none', reviewed_at = '', updated_at = ? WHERE id = ?")
+        .run(now, task.id)
+      if (task.cycle_id !== '') resequenceCycle(database, task.cycle_id)
+      // Close the turn when this was its last active task, so the cycle can start again.
+      if (task.turn_id !== '') {
+        const active = database.prepare("SELECT COUNT(*) AS value FROM tasks WHERE turn_id = ? AND status IN ('doing', 'in_review', 'blocked', 'todo')").get(task.turn_id)
+        if (Number(active?.value ?? 0) === 0) {
+          database.prepare("UPDATE turns SET state = 'done', finished_at = ? WHERE id = ?").run(now, task.turn_id)
+        }
+      }
+      return database.prepare('SELECT * FROM tasks WHERE id = ?').get(task.id)
+    }
+    if (task.status !== 'todo') throw new Error('Only a queued or blocked task can go back to review')
     if (task.turn_id !== '') throw new Error('This task is already part of a turn')
     database.prepare("UPDATE tasks SET status = 'pending_approval', review_state = 'none', reviewed_at = '', updated_at = ? WHERE id = ?")
-      .run(new Date().toISOString(), task.id)
+      .run(now, task.id)
     return database.prepare('SELECT * FROM tasks WHERE id = ?').get(task.id)
   }
 
@@ -1988,12 +2041,15 @@ Resolve any conflicts. Then fix the reason, commit with a message starting "${ta
     const database = await db()
     const task = database.prepare('SELECT * FROM tasks WHERE id = ?').get(text(id))
     if (task === undefined) throw new Error('task not found')
-    if (task.status !== 'pending_approval' && task.status !== 'in_review') {
-      throw new Error('only a task in review can be archived')
+    if (task.status !== 'pending_approval' && task.status !== 'in_review' && task.status !== 'blocked') {
+      throw new Error('only a task in review or blocked can be archived')
     }
     const now = new Date().toISOString()
-    database.prepare('UPDATE tasks SET archived_at = ?, updated_at = ? WHERE id = ?')
-      .run(now, now, task.id)
+    // A blocked task still counts as pending work; cancel it so the cycle can move on.
+    const status = task.status === 'blocked' ? 'canceled' : task.status
+    database.prepare('UPDATE tasks SET status = ?, archived_at = ?, updated_at = ? WHERE id = ?')
+      .run(status, now, now, task.id)
+    if (task.status === 'blocked') await finishTurnIfDone(task.turn_id)
     return database.prepare('SELECT * FROM tasks WHERE id = ?').get(task.id)
   }
 
@@ -2053,6 +2109,8 @@ Resolve any conflicts. Then fix the reason, commit with a message starting "${ta
     const database = await db()
     const turn = await turnById(task.turn_id)
     if (turn === undefined) return
+    // A paused turn keeps the submitted task in review and waits for Resume.
+    if (turn.state === 'paused') return
     const next = database.prepare("SELECT * FROM tasks WHERE turn_id = ? AND status = 'todo' ORDER BY sequence ASC, priority DESC, created_at ASC LIMIT 1").get(turn.id)
     if (next !== undefined) {
       try {
@@ -2413,6 +2471,14 @@ Resolve any conflicts. Then fix the reason, commit with a message starting "${ta
         }
         if (body.op === 'saveTurnNote') {
           sendJson(res, 200, { ok: true, turn: await saveTurnNote(body.turnId, body.note) })
+          return
+        }
+        if (body.op === 'pauseTurn') {
+          sendJson(res, 200, { ok: true, turn: await pauseTurn(body.turnId) })
+          return
+        }
+        if (body.op === 'resumeTurn') {
+          sendJson(res, 200, { ok: true, turn: await resumeTurn(body.turnId) })
           return
         }
         if (body.op === 'unapprove') {

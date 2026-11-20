@@ -35,6 +35,7 @@ export type FlowIcon =
   | 'archive'
   | 'terminal'
   | 'refresh'
+  | 'close'
 
 export interface FlowCheck {
   id: string
@@ -43,6 +44,8 @@ export interface FlowCheck {
   meta?: string
   status: FlowStatus
   icon: FlowIcon
+  /** Wire tool name, when the check is a tool call. */
+  tool?: string
   seq?: number
   time?: number
 }
@@ -78,6 +81,9 @@ export interface FlowDetail {
   body: string
   meta?: string
   status: FlowStatus
+  turn?: number
+  /** Wire tool name, when the detail belongs to a tool call. */
+  tool?: string
 }
 
 export interface FlowPersistEvent {
@@ -91,10 +97,11 @@ export interface FlowPersistEvent {
   meta?: string
   time?: number
   seq?: number
+  tool?: string
 }
 
 export interface FlowNodeData {
-  kind: 'turn' | 'verify' | 'planning' | 'task'
+  kind: 'turn' | 'verify' | 'planning' | 'task' | 'response'
   title: string
   detail?: string
   meta?: string
@@ -105,6 +112,7 @@ export interface FlowNodeData {
   plan?: FlowPlanItem[]
   detailId?: string
   taskIndex?: number
+  turn?: number
 }
 
 export interface FlowNode extends FlowNodeData {
@@ -251,6 +259,54 @@ const PHASE_ICON: Record<FlowPhase, FlowIcon> = {
   other: 'info',
 }
 
+/** Per-tool row icon; the phase icon is the fallback for unknown tools. */
+const TOOL_ICON: Record<string, FlowIcon> = {
+  bash: 'terminal',
+  pwsh: 'terminal',
+  terminal_open: 'terminal',
+  terminal_send: 'terminal',
+  terminal_read: 'terminal',
+  terminal_signal: 'terminal',
+  terminal_close: 'terminal',
+  terminal_list: 'terminal',
+  read: 'info',
+  read_image: 'info',
+  write: 'code',
+  edit: 'code',
+  apply_patch: 'code',
+  str_replace_editor: 'code',
+  grep: 'search',
+  glob: 'search',
+  web_search: 'search',
+  web_fetch: 'search',
+  subagent: 'tool',
+  subagent_fork: 'tool',
+  todo_write: 'list',
+  skill: 'brain',
+  present: 'archive',
+  ask_user_question: 'user',
+  workflow: 'route',
+  schedule_create: 'refresh',
+  schedule_edit: 'refresh',
+  schedule_list: 'list',
+  schedule_view: 'info',
+  job_output: 'terminal',
+  job_list: 'list',
+  job_kill: 'close',
+  create_goal: 'route',
+  get_goal: 'info',
+  update_goal: 'route',
+  office_render: 'archive',
+  office_convert: 'archive',
+  office_recalculate: 'refresh',
+  working_directory: 'terminal',
+  load_workspace_dependencies: 'tool',
+}
+
+function toolIcon(name: string | undefined, phase: FlowPhase): FlowIcon {
+  return TOOL_ICON[(name ?? '').toLowerCase()] ?? PHASE_ICON[phase]
+}
+
 /** Task header icon: the strongest action the task actually performed. */
 const TASK_ICON_ORDER: readonly FlowIcon[] = ['code', 'test', 'search', 'user', 'message', 'brain', 'tool', 'list', 'info']
 
@@ -258,7 +314,7 @@ function taskIcon(checks: readonly FlowCheck[]): FlowIcon {
   const running = checks.find((check) => check.status === 'running')
   if (running !== undefined) return running.icon
   for (const icon of TASK_ICON_ORDER) {
-    if (checks.some((check) => check.icon === icon)) return icon
+    if (checks.some((check) => PHASE_ICON[check.phase] === icon)) return icon
   }
   return 'list'
 }
@@ -297,12 +353,6 @@ function safeStringify(value: unknown): string {
   } catch {
     return ''
   }
-}
-
-function rawArgsOf(args: unknown): string {
-  if (args === null || args === undefined) return ''
-  if (typeof args === 'string') return args
-  return safeStringify(args)
 }
 
 function duration(callTime: unknown, time: unknown): string | undefined {
@@ -385,25 +435,154 @@ function phaseOfTool(name: string | undefined, args: unknown): FlowPhase {
   return 'tools'
 }
 
-function toolTitle(name: string | undefined, args: unknown, fallback: string): string {
-  const tool = name === undefined || name === '' ? fallback : name
-  const record = args !== null && typeof args === 'object' ? args as Record<string, unknown> : undefined
-  const path = record?.path ?? record?.file_path ?? record?.filePath ?? record?.target
-  if (typeof path === 'string' && path !== '') return `${tool} · ${path}`
-  const command = record?.command ?? record?.cmd
-  if (typeof command === 'string' && command !== '') return `${tool} · ${command}`
-  const pattern = record?.pattern ?? record?.query
-  if (typeof pattern === 'string' && pattern !== '') return `${tool} · ${pattern}`
-  const url = record?.url
-  if (typeof url === 'string' && url !== '') return `${tool} · ${url}`
-  const raw = rawArgsOf(args)
-  return raw === '' ? tool : `${tool} · ${preview(raw)}`
+/** Parse tool args, accepting either the decoded object or the raw JSON string. */
+function argsRecord(args: unknown): Record<string, unknown> | undefined {
+  if (args === null || args === undefined) return undefined
+  if (typeof args === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(args)
+      return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return typeof args === 'object' && !Array.isArray(args) ? args as Record<string, unknown> : undefined
+}
+
+function stringField(record: Record<string, unknown> | undefined, keys: readonly string[]): string {
+  if (record === undefined) return ''
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim() !== '') return value.trim()
+  }
+  return ''
+}
+
+/** First short string value in the args, for tools without a known field. */
+function firstStringValue(record: Record<string, unknown> | undefined): string {
+  if (record === undefined) return ''
+  for (const value of Object.values(record)) {
+    if (typeof value === 'string' && value.trim() !== '' && value.length <= 120) return value.trim()
+  }
+  return ''
+}
+
+function firstQuestion(record: Record<string, unknown> | undefined): string {
+  const questions = record?.questions
+  if (!Array.isArray(questions)) return ''
+  for (const item of questions) {
+    if (item !== null && typeof item === 'object') {
+      const text = stringField(item as Record<string, unknown>, ['question', 'header'])
+      if (text !== '') return text
+    }
+  }
+  return ''
+}
+
+/**
+ * One-line readable decorator for a tool call, built from its JSON args.
+ * Bash shows `> command`; edit/write/read show the path; search shows the
+ * pattern; every other tool falls back to its first meaningful string field.
+ */
+function decoratorOf(name: string | undefined, args: unknown, max = MAX_TITLE): string {
+  const tool = (name ?? '').toLowerCase()
+  const record = argsRecord(args)
+  const raw = typeof args === 'string' && record === undefined ? args.trim() : ''
+  const path = stringField(record, ['file_path', 'path', 'filePath', 'target', 'notebook_path'])
+  const command = stringField(record, ['command', 'cmd'])
+  const pattern = stringField(record, ['pattern', 'query', 'glob'])
+  const url = stringField(record, ['url'])
+  const description = stringField(record, ['description', 'title', 'name', 'objective', 'prompt'])
+  const question = firstQuestion(record)
+  const queries = record?.queries
+  const query = Array.isArray(queries) ? queries.filter((value): value is string => typeof value === 'string').join(', ') : ''
+  const todos = record?.todos
+  const todoCount = Array.isArray(todos) ? todos.length : 0
+  const files = record?.files
+  const fileCount = Array.isArray(files) ? files.length : 0
+  const meta = record?.meta
+  const metaName = meta !== null && typeof meta === 'object'
+    ? stringField(meta as Record<string, unknown>, ['name', 'description'])
+    : ''
+  const jobId = stringField(record, ['job_id', 'jobId'])
+  const terminalId = stringField(record, ['terminal_id', 'terminalId'])
+  const cd = stringField(record, ['cd'])
+
+  if (/bash|shell|exec|run|command|terminal|pwsh/u.test(tool)) {
+    return preview(
+      command !== '' ? `> ${command}`
+        : description !== '' ? `> ${description}`
+          : terminalId !== '' ? terminalId
+            : raw !== '' ? `> ${raw}` : tool,
+      max,
+    )
+  }
+  if (/web_search/u.test(tool)) return preview(query !== '' ? query : description !== '' ? description : tool, max)
+  if (/web_fetch/u.test(tool)) return preview(url !== '' ? url : description !== '' ? description : tool, max)
+  if (/ask_user|question|clarify/u.test(tool)) return preview(question !== '' ? question : description !== '' ? description : tool, max)
+  if (/todo/u.test(tool)) return preview(todoCount > 0 ? `${todoCount} tasks` : description !== '' ? description : tool, max)
+  if (/present/u.test(tool)) return preview(fileCount > 0 ? `${fileCount} files` : description !== '' ? description : tool, max)
+  if (/workflow/u.test(tool)) return preview(metaName !== '' ? metaName : description !== '' ? description : tool, max)
+  if (/job/u.test(tool)) return preview(jobId !== '' ? jobId : description !== '' ? description : tool, max)
+  if (/working_directory/u.test(tool)) return preview(cd !== '' ? cd : description !== '' ? description : tool, max)
+  if (/apply_patch/u.test(tool)) {
+    const input = stringField(record, ['input'])
+    const file = /\*\*\* (?:Update|Add|Delete) File: (.+)/u.exec(input)?.[1]?.trim() ?? ''
+    return preview(file !== '' ? file : input !== '' ? 'patch' : tool, max)
+  }
+  if (/edit|write|patch|create|delete|move|rename|apply|str_replace/u.test(tool)) {
+    return preview(path !== '' ? path : description !== '' ? description : firstStringValue(record) || tool, max)
+  }
+  if (/read|inspect|cat|view/u.test(tool)) {
+    return preview(path !== '' ? path : description !== '' ? description : firstStringValue(record) || tool, max)
+  }
+  if (/grep|glob|search|find|list/u.test(tool)) {
+    const scope = path !== '' ? ` in ${path}` : ''
+    return preview(pattern !== '' ? `${pattern}${scope}` : description !== '' ? description : firstStringValue(record) || tool, max)
+  }
+  if (/subagent|task|agent/u.test(tool)) return preview(description !== '' ? description : tool, max)
+  if (/skill/u.test(tool)) return preview(description !== '' ? description : tool, max)
+  const fallback = command || path || pattern || url || query || question || description || metaName || jobId || cd
+    || firstStringValue(record) || raw
+  return preview(fallback !== '' ? fallback : tool, max)
+}
+
+/** Readable detail body: the decorator line, then the result. No raw JSON. */
+function toolBody(name: string | undefined, args: unknown, result: string, t: (key: string) => string): string {
+  const tool = (name ?? '').toLowerCase()
+  const command = stringField(argsRecord(args), ['command', 'cmd'])
+  // The detail keeps a multi-line shell command intact; the row stays one line.
+  const decorator = /bash|shell|exec|run|command|terminal|pwsh/u.test(tool) && command !== ''
+    ? `> ${command}`
+    : decoratorOf(name, args, 4000)
+  const parts: string[] = []
+  if (decorator !== '') parts.push(decorator)
+  if (result !== '') parts.push(`${t('flow.result')}\n${result}`)
+  return parts.join('\n\n')
 }
 
 function firstPrompt(events: readonly FlowEventNode[]): string {
   for (const node of events) {
     if (node.kind === 'user' || node.kind === 'steering') {
       const text = rawTextOf(node.content)
+      if (text !== '') return text
+    }
+  }
+  return ''
+}
+
+/** Last assistant text block of the turn: the final response shown to the user. */
+function finalResponse(events: readonly FlowEventNode[]): string {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const node = events[index]
+    if (node.kind !== 'assistant') continue
+    const blocks = Array.isArray(node.blocks) ? node.blocks : []
+    for (let blockIndex = blocks.length - 1; blockIndex >= 0; blockIndex -= 1) {
+      const block = blocks[blockIndex]
+      if (block?.kind !== 'text') continue
+      const text = stripFlowMeta(block.text ?? '')
       if (text !== '') return text
     }
   }
@@ -482,11 +661,14 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
     .pop()
   const status = turnStatus(snapshot, turn, input.running)
   const meta = parseFlowMeta(events)
-  let turnPrompt = firstPrompt(events)
-  if (typeof meta?.turn === 'string' && meta.turn.trim() !== '') turnPrompt = meta.turn.trim()
+  // The turn node shows the user's original prompt; the flow-meta summary is
+  // only a fallback when the prompt is outside the loaded window.
+  const userPrompt = firstPrompt(events)
+  const metaTurn = typeof meta?.turn === 'string' && meta.turn.trim() !== '' ? meta.turn.trim() : ''
+  let turnPrompt = userPrompt !== '' ? userPrompt : metaTurn
   const verifyText = typeof meta?.verify === 'string' && meta.verify.trim() !== '' && meta.verify.trim() !== 'clear'
     ? meta.verify.trim()
-    : turnPrompt
+    : metaTurn !== '' ? metaTurn : turnPrompt
   const turnId = `turn-${turn}`
   const detailById: Record<string, FlowDetail> = {}
 
@@ -562,26 +744,32 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
     seq?: number,
     time?: number,
     live = true,
+    tool?: string,
   ): void => {
     const index = taskIndexForStep(step, taskCount)
     const safeTitle = title.trim() === '' ? input.t('flow.task') : title
+    const toolName = tool === undefined || tool === '' ? undefined : tool
     checksByTask[index].push({
       id,
       phase,
       title: preview(safeTitle, MAX_TITLE),
       ...(meta === undefined || meta === '' ? {} : { meta }),
       status: checkStatus,
-      icon: icon ?? PHASE_ICON[phase],
+      icon: icon ?? toolIcon(toolName, phase),
+      ...(toolName === undefined ? {} : { tool: toolName }),
       ...(seq === undefined ? {} : { seq }),
       ...(time === undefined ? {} : { time }),
     })
     detailById[id] = {
       id,
       title: preview(safeTitle, MAX_TITLE),
-      subtitle: input.t(PHASE_TITLE[phase]),
+      subtitle: toolName === undefined
+        ? input.t(PHASE_TITLE[phase])
+        : `${toolName} · ${input.t(PHASE_TITLE[phase])}`,
       body: detail === '' ? input.t('flow.noDetail') : detail,
       ...(meta === undefined || meta === '' ? {} : { meta }),
       status: checkStatus,
+      ...(toolName === undefined ? {} : { tool: toolName }),
     }
     if (live) liveIds.add(id)
   }
@@ -611,9 +799,9 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
     }
 
     if (node.kind === 'tool-result') {
-      const rawArgs = rawArgsOf(node.call?.argsRaw ?? node.args)
+      const args = node.call?.argsRaw ?? node.args
       const result = rawTextOf(node.content) || safeStringify(node.content)
-      const phase = phaseOfTool(node.name, node.call?.argsRaw ?? node.args)
+      const phase = phaseOfTool(node.name, args)
       const meta = [
         duration(node.callTime, node.time),
         Array.isArray(node.subCalls) && node.subCalls.length > 0 ? `+${node.subCalls.length}` : undefined,
@@ -622,16 +810,15 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
         step,
         `task-call-${node.callId === undefined || node.callId === '' ? node.seq : node.callId}`,
         phase,
-        toolTitle(node.name, node.call?.argsRaw ?? node.args, input.t('flow.tool')),
-        [
-          rawArgs === '' ? '' : `${input.t('flow.args')}\n${rawArgs}`,
-          result === '' ? '' : `${input.t('flow.result')}\n${result}`,
-        ].filter((part) => part !== '').join('\n\n'),
+        decoratorOf(node.name, args),
+        toolBody(node.name, args, result, input.t),
         node.isError === true ? 'error' : 'done',
         meta,
-        PHASE_ICON[phase],
+        toolIcon(node.name, phase),
         node.seq,
         node.time,
+        true,
+        node.name,
       )
       continue
     }
@@ -672,17 +859,21 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
   for (const [index, call] of (snapshot.runningCalls ?? []).entries()) {
     if (call.turn !== turn) continue
     const step = typeof call.step === 'number' ? call.step : 1
-    const rawArgs = rawArgsOf(call.argsRaw ?? call.args)
-    const phase = phaseOfTool(call.name, call.argsRaw ?? call.args)
+    const args = call.argsRaw ?? call.args
+    const phase = phaseOfTool(call.name, args)
     addCheck(
       step,
       `task-call-${call.callId === undefined || call.callId === '' ? `running-${index}` : call.callId}`,
       phase,
-      toolTitle(call.name, call.argsRaw ?? call.args, input.t('flow.tool')),
-      rawArgs === '' ? '' : `${input.t('flow.args')}\n${rawArgs}`,
+      decoratorOf(call.name, args),
+      toolBody(call.name, args, '', input.t),
       'running',
       input.t('flow.running'),
-      PHASE_ICON[phase],
+      toolIcon(call.name, phase),
+      undefined,
+      undefined,
+      true,
+      call.name,
     )
   }
 
@@ -715,6 +906,7 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
       event.seq,
       event.time,
       false,
+      event.tool,
     )
   }
 
@@ -778,6 +970,7 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
         ...(check.meta === undefined ? {} : { meta: check.meta }),
         ...(check.time === undefined ? {} : { time: check.time }),
         ...(check.seq === undefined ? {} : { seq: check.seq }),
+        ...(check.tool === undefined ? {} : { tool: check.tool }),
       })
     }
   }
@@ -824,10 +1017,19 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
   detailById[turnId] = { ...detailById[turnId], status: finalStatus }
 
   const taskHeights = groups.map((group) => TASK_HEADER_HEIGHT + group.checks.length * CHECK_ROW_HEIGHT)
-  const taskColumnHeight = taskHeights.reduce((sum, height) => sum + height, 0) + Math.max(0, groups.length - 1) * COLUMN_GAP
-  const baseY = Math.max(0, (taskColumnHeight - TURN_HEIGHT) / 2)
   const planHeight = PLAN_HEADER_HEIGHT + planItems.length * PLAN_ROW_HEIGHT
-  const planY = Math.max(0, (taskColumnHeight - planHeight) / 2)
+  // Top-down: turn -> verify -> planning stack in one centered column, then
+  // the task branches fan out side by side under the planning node.
+  const columnWidth = Math.max(TURN_WIDTH, VERIFY_WIDTH, PLAN_WIDTH)
+  const centeredX = (width: number): number => (columnWidth - width) / 2
+  const turnY = 0
+  const verifyY = turnY + TURN_HEIGHT + COLUMN_GAP
+  const planningY = verifyY + VERIFY_HEIGHT + COLUMN_GAP
+  const taskY = planningY + planHeight + COLUMN_GAP
+  const taskRowWidth = groups.length === 0
+    ? 0
+    : groups.length * TASK_WIDTH + (groups.length - 1) * COLUMN_GAP
+  const taskStartX = columnWidth / 2 - taskRowWidth / 2
 
   const nodes: FlowNode[] = [
     {
@@ -839,7 +1041,7 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
       status: finalStatus,
       icon: 'route',
       detailId: turnId,
-      position: { x: 0, y: baseY },
+      position: { x: centeredX(TURN_WIDTH), y: turnY },
       width: TURN_WIDTH,
       height: TURN_HEIGHT,
     },
@@ -851,7 +1053,7 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
       status: detailById[verifyDetailId].status,
       icon: 'search',
       detailId: verifyDetailId,
-      position: { x: TURN_WIDTH + COLUMN_GAP, y: baseY },
+      position: { x: centeredX(VERIFY_WIDTH), y: verifyY },
       width: VERIFY_WIDTH,
       height: VERIFY_HEIGHT,
     },
@@ -865,13 +1067,12 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
       progress: { done: planDone, total: planItems.length },
       plan: planItems,
       detailId: planDetailId,
-      position: { x: TURN_WIDTH + VERIFY_WIDTH + COLUMN_GAP * 2, y: planY },
+      position: { x: centeredX(PLAN_WIDTH), y: planningY },
       width: PLAN_WIDTH,
       height: planHeight,
     },
   ]
 
-  let taskY = 0
   for (const [index, group] of groups.entries()) {
     const height = taskHeights[index]
     nodes.push({
@@ -884,11 +1085,38 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
       checks: group.checks,
       detailId: group.detailId,
       taskIndex: group.index,
-      position: { x: TURN_WIDTH + VERIFY_WIDTH + PLAN_WIDTH + COLUMN_GAP * 3, y: taskY },
+      position: { x: taskStartX + index * (TASK_WIDTH + COLUMN_GAP), y: taskY },
       width: TASK_WIDTH,
       height,
     })
-    taskY += height + COLUMN_GAP
+  }
+
+  const responseText = status === 'running' ? '' : finalResponse(events)
+  const responseId = 'response'
+  const responseHeight = 220
+  if (responseText !== '') {
+    const taskRowHeight = taskHeights.length === 0 ? 0 : Math.max(...taskHeights)
+    nodes.push({
+      id: responseId,
+      kind: 'response',
+      title: input.t('flow.response'),
+      detail: responseText,
+      status: finalStatus,
+      icon: 'message',
+      turn,
+      detailId: 'response-detail',
+      position: { x: columnWidth / 2 - TASK_WIDTH / 2, y: taskY + taskRowHeight + COLUMN_GAP },
+      width: TASK_WIDTH,
+      height: responseHeight,
+    })
+    detailById['response-detail'] = {
+      id: 'response-detail',
+      title: input.t('flow.response'),
+      subtitle: input.t('flow.done'),
+      body: responseText,
+      status: finalStatus,
+      turn,
+    }
   }
 
   const edges: FlowEdge[] = [
@@ -897,6 +1125,11 @@ export function buildFlowGraph(input: FlowInput): FlowGraph {
   ]
   for (const group of groups) {
     edges.push({ id: `edge-plan-${group.id}`, source: 'planning', target: group.id, animated: group.status === 'running' })
+  }
+  if (responseText !== '') {
+    for (const group of groups) {
+      edges.push({ id: `edge-${group.id}-response`, source: group.id, target: responseId, animated: false })
+    }
   }
 
   return {

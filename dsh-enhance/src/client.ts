@@ -1,5 +1,6 @@
 import React from 'react'
 import { FlowView } from './flow-view'
+import { preferFlowView } from './flow-preference'
 
 const h: any = React.createElement
 const NS = 'dshEnhance'
@@ -135,6 +136,7 @@ let layoutService: any = null
       'flow.args': 'Arguments',
       'flow.result': 'Result',
       'flow.detail': 'Detail',
+      'flow.summary': 'Open turn summary',
       'flow.close': 'Close detail',
       'flow.task': 'Task',
       'flow.selectTurn': 'Select turn',
@@ -282,6 +284,7 @@ let layoutService: any = null
       'flow.args': '参数',
       'flow.result': '结果',
       'flow.detail': '详情',
+      'flow.summary': '打开轮次摘要',
       'flow.close': '关闭详情',
       'flow.task': '任务',
       'flow.selectTurn': '选择轮次',
@@ -2239,7 +2242,7 @@ let layoutService: any = null
       )
     }
 
-    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sidebarRight', 'sidebarRightTabs', 'shortcuts', 'layout', 'remote', 'remote.session']
+    const inject = ['slots', 'locale', 'uiWorkspace', 'workspaces', 'sessions', 'sidebarRight', 'sidebarRightTabs', 'shortcuts', 'layout', 'remote', 'remote.session']
 
     function DecoratorStyle() {
       const [decorators, setDecorators] = React.useState({ tools: {}, variants: {} })
@@ -2469,9 +2472,43 @@ let layoutService: any = null
           order: 20,
           locale: NS,
           label: () => t('flow.title'),
+          children: {
+            'conversation.chat.turnTail': { kind: 'list', scope: 'session' },
+          },
         }, FlowView)),
         'dsh-enhance: flow view',
       )
+
+      // New Sessions open on Flow. The Conversation store reads its view
+      // preference from localStorage when it is created, so write it as soon
+      // as the Session appears in the catalog.
+      ctx.effect(() => {
+        const sessions = ctx.sessions
+        const seen = new Set<string>()
+        let ready = false
+        const apply = (): void => {
+          const state: any = sessions.list.getSnapshot()
+          if (state === null || typeof state !== 'object' || state.phase !== 'ready') return
+          const ids = Array.isArray(state.ids) ? state.ids : []
+          if (!ready) {
+            for (const id of ids) {
+              if (typeof id !== 'string' || id === '') continue
+              seen.add(id)
+              if (state.byId?.[id]?.blank === true) preferFlowView(id)
+            }
+            ready = true
+            return
+          }
+          for (const id of ids) {
+            if (typeof id !== 'string' || id === '') continue
+            const isNew = !seen.has(id)
+            seen.add(id)
+            if (isNew || state.byId?.[id]?.blank === true) preferFlowView(id)
+          }
+        }
+        apply()
+        return sessions.list.subscribe(apply)
+      }, 'dsh-enhance: flow default view')
 
       const inGlobal = (target) => target !== undefined && target !== null
         && typeof target.closest === 'function'

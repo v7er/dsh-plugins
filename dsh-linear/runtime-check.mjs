@@ -158,6 +158,14 @@ try {
   assert.equal(bad.body.ok, false)
   assert.match(bad.body.error, /task not found/)
 
+  const badPause = await call('/dsh-linear/act', 'POST', { op: 'pauseTurn', turnId: 'missing' })
+  assert.equal(badPause.body.ok, false)
+  assert.match(badPause.body.error, /turn not found/)
+
+  const badResume = await call('/dsh-linear/act', 'POST', { op: 'resumeTurn', turnId: 'missing' })
+  assert.equal(badResume.body.ok, false)
+  assert.match(badResume.body.error, /turn not found/)
+
   const badCycle = await call('/dsh-linear/act', 'POST', { op: 'updateCycle', cycle: { id: 'missing', name: 'x' } })
   assert.equal(badCycle.body.ok, false)
   assert.match(badCycle.body.error, /cycle not found/)

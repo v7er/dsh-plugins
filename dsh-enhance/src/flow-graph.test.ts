@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildFlowGraph, type FlowInput } from './flow-graph.ts'
 import { MOCK_FLOW_SNAPSHOT, MOCK_FLOW_TODOS } from './flow-mock.ts'
+import { CONVERSATION_STORE_KEY, FLOW_VIEW_ID, preferFlowView } from './flow-preference.ts'
 
 const t = (key: string, params?: Record<string, string | number>): string =>
   params === undefined ? key : `${key}:${JSON.stringify(params)}`
@@ -225,7 +226,8 @@ test('flow-meta line drives turn, verify, and plan without a todo list', () => {
     },
   }))
 
-  assert.equal(graph.turn?.prompt, 'Add dark mode toggle')
+  assert.equal(graph.turn?.prompt, 'add dark mode')
+  assert.equal(graph.nodes.find((node) => node.kind === 'turn')?.detail, 'add dark mode')
   assert.deepEqual(graph.groups.map((group) => group.title), ['Read settings', 'Add toggle', 'Test'])
   assert.equal(graph.nodes.find((node) => node.kind === 'planning')?.plan?.length, 3)
   assert.equal(graph.nodes.find((node) => node.kind === 'verify')?.detail, 'Add dark mode toggle')
@@ -283,4 +285,139 @@ test('task icon follows the strongest action, not the first check', () => {
 
   assert.equal(graph.nodes.find((node) => node.id === 'task-0')?.icon, 'code')
   assert.equal(graph.nodes.find((node) => node.id === 'task-1')?.icon, 'user')
+})
+
+test('top-down layout keeps the branch: turn, verify, planning stack, tasks fan out', () => {
+  const graph = buildFlowGraph(input({
+    todos: [
+      { content: 'task A', status: 'pending' },
+      { content: 'task B', status: 'pending' },
+    ],
+    snapshot: {
+      eventNodes: [
+        { kind: 'assistant', seq: 1, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'go' }] },
+      ],
+      requests: [{ turn: 1, status: 'complete' }],
+      partial: null,
+      runningCalls: [],
+    },
+  }))
+  const byKind = (kind: string) => graph.nodes.filter((node) => node.kind === kind)
+  const [turn] = byKind('turn')
+  const [verify] = byKind('verify')
+  const [planning] = byKind('planning')
+  const tasks = byKind('task')
+  assert.ok(turn !== undefined && verify !== undefined && planning !== undefined)
+  assert.equal(tasks.length, 2)
+  assert.ok(turn.position.y < verify.position.y)
+  assert.ok(verify.position.y < planning.position.y)
+  assert.ok(planning.position.y < tasks[0].position.y)
+  const mid = (node: { position: { x: number }; width: number }): number => node.position.x + node.width / 2
+  assert.equal(mid(turn), mid(planning))
+  assert.equal(mid(verify), mid(planning))
+  assert.ok(tasks[0].position.x < tasks[1].position.x)
+  assert.equal(tasks[0].position.y, tasks[1].position.y)
+  const rowMid = (tasks[0].position.x + tasks[1].position.x + tasks[1].width) / 2
+  assert.equal(rowMid, mid(planning))
+})
+
+test('finished turn adds a final response node after the task branches', () => {
+  const graph = buildFlowGraph(input({
+    todos: [{ content: 'task A', status: 'completed' }],
+    snapshot: {
+      eventNodes: [
+        { kind: 'user', seq: 1, turn: 1, step: 1, content: [{ kind: 'text', text: 'go' }] },
+        { kind: 'assistant', seq: 2, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'final answer' }] },
+      ],
+      requests: [{ turn: 1, status: 'complete' }],
+      partial: null,
+      runningCalls: [],
+    },
+  }))
+  const response = graph.nodes.find((node) => node.kind === 'response')
+  assert.ok(response !== undefined)
+  assert.equal(response.detail, 'final answer')
+  assert.equal(response.turn, 1)
+  assert.ok(graph.edges.some((edge) => edge.source === 'task-0' && edge.target === 'response'))
+})
+
+test('tool rows show a readable decorator instead of raw JSON', () => {
+  const graph = buildFlowGraph(input({
+    todos: [
+      { content: 'task A', status: 'completed' },
+      { content: 'task B', status: 'completed' },
+    ],
+    snapshot: {
+      eventNodes: [
+        { kind: 'user', seq: 1, turn: 1, step: 1, content: [{ kind: 'text', text: 'go' }] },
+        { kind: 'tool-result', seq: 2, turn: 1, step: 1, callId: 'bash', name: 'bash', args: { command: 'npm test -- --watch=false' }, content: 'pass 12' },
+        { kind: 'tool-result', seq: 3, turn: 1, step: 1, callId: 'edit', name: 'edit', args: { file_path: 'src/theme.ts', old_string: 'a', new_string: 'b' }, content: 'applied' },
+        { kind: 'tool-result', seq: 4, turn: 1, step: 1, callId: 'read', name: 'read', args: { file_path: 'src/settings.ts' }, content: 'export {}' },
+        { kind: 'tool-result', seq: 5, turn: 1, step: 1, callId: 'grep', name: 'grep', args: { pattern: 'darkMode', path: 'src' }, content: '1 match' },
+        { kind: 'tool-result', seq: 6, turn: 1, step: 1, callId: 'web', name: 'web_search', args: { queries: ['dark mode css'] }, content: 'results' },
+        { kind: 'tool-result', seq: 7, turn: 1, step: 2, callId: 'todo', name: 'todo_write', args: { todos: [{ content: 'a' }, { content: 'b' }] }, content: 'ok' },
+        { kind: 'tool-result', seq: 8, turn: 1, step: 2, callId: 'present', name: 'present', args: { files: [{ path: 'a.png' }] }, content: 'ok' },
+        { kind: 'tool-result', seq: 9, turn: 1, step: 2, callId: 'ask', name: 'ask_user_question', args: { questions: [{ question: 'Which theme?' }] }, content: 'dark' },
+      ],
+      requests: [{ turn: 1, status: 'complete' }],
+      partial: null,
+      runningCalls: [],
+    },
+  }))
+
+  const first = graph.groups[0].checks
+  const second = graph.groups[1].checks
+  assert.deepEqual(first.map((check) => check.title), [
+    '> npm test -- --watch=false',
+    'src/theme.ts',
+    'src/settings.ts',
+    'darkMode in src',
+    'dark mode css',
+  ])
+  assert.deepEqual(second.map((check) => check.title), ['2 tasks', '1 files', 'Which theme?'])
+  assert.deepEqual([...first, ...second].map((check) => check.tool), ['bash', 'edit', 'read', 'grep', 'web_search', 'todo_write', 'present', 'ask_user_question'])
+  assert.deepEqual([...first, ...second].map((check) => check.icon), ['terminal', 'code', 'info', 'search', 'search', 'list', 'archive', 'user'])
+  assert.equal(graph.detailById['task-call-bash'].body, '> npm test -- --watch=false\n\nflow.result\npass 12')
+  assert.equal(graph.detailById['task-call-edit'].body, 'src/theme.ts\n\nflow.result\napplied')
+  assert.equal(graph.detailById['task-call-edit'].subtitle, 'edit · flow.phase.coding')
+  assert.equal(graph.persistEvents.find((event) => event.id === 'task-call-bash')?.tool, 'bash')
+})
+
+test('running turn has no final response node', () => {
+  const graph = buildFlowGraph(input({
+    running: true,
+    snapshot: {
+      eventNodes: [
+        { kind: 'assistant', seq: 1, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'still writing' }] },
+      ],
+      requests: [{ turn: 1, status: 'running' }],
+      partial: null,
+      runningCalls: [],
+    },
+  }))
+  assert.equal(graph.nodes.some((node) => node.kind === 'response'), false)
+})
+
+test('new sessions default to the Flow view without losing a draft', () => {
+  const store = new Map<string, string>()
+  const storage = {
+    getItem: (key: string): string | null => store.get(key) ?? null,
+    setItem: (key: string, value: string): void => { store.set(key, value) },
+  }
+  const key = `${CONVERSATION_STORE_KEY}.session-1`
+
+  preferFlowView('session-1', storage)
+  assert.deepEqual(JSON.parse(store.get(key) ?? '{}'), { draft: '', view: FLOW_VIEW_ID, viewRequest: null })
+
+  store.set(key, JSON.stringify({ draft: { text: 'keep me', references: [] }, view: null, viewRequest: null }))
+  preferFlowView('session-1', storage)
+  assert.deepEqual(JSON.parse(store.get(key) ?? '{}'), {
+    draft: { text: 'keep me', references: [] },
+    view: FLOW_VIEW_ID,
+    viewRequest: null,
+  })
+
+  store.set(key, JSON.stringify({ draft: '', view: 'chat', viewRequest: null }))
+  preferFlowView('session-1', storage)
+  assert.equal(JSON.parse(store.get(key) ?? '{}').view, 'chat')
 })
